@@ -42,7 +42,11 @@ function deployNow() {
                 <div class="text-sm font-medium">Webhook URL</div>
                 <pre class="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">{{ site.webhook_url }}</pre>
             </div>
-            <button class="self-start rounded bg-black px-4 py-2 text-sm text-white dark:bg-white dark:text-black" @click="installRepo">
+            <button
+                :disabled="site.status === 'pending'"
+                class="self-start rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
+                @click="installRepo"
+            >
                 Install repository
             </button>
         </section>
