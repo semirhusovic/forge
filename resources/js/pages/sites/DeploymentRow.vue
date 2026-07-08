@@ -18,15 +18,24 @@ watch(
 );
 
 async function fetchLog() {
-    const response = await fetch(deploymentShow.url([props.deployment.site_id, props.deployment.id]), {
-        headers: { Accept: 'application/json' },
-    });
-    const data = await response.json();
-    log.value = data.output ?? '';
-    liveStatus.value = data.status;
+    try {
+        const response = await fetch(deploymentShow.url([props.deployment.site_id, props.deployment.id]), {
+            headers: { Accept: 'application/json' },
+        });
 
-    if (data.status !== 'pending' && data.status !== 'running') {
-        stopPolling();
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        log.value = data.output ?? '';
+        liveStatus.value = data.status;
+
+        if (data.status !== 'pending' && data.status !== 'running') {
+            stopPolling();
+        }
+    } catch {
+        // Transient network error — keep polling.
     }
 }
 
@@ -41,6 +50,7 @@ function toggle() {
     expanded.value = !expanded.value;
 
     if (expanded.value) {
+        stopPolling();
         fetchLog();
         timer = setInterval(fetchLog, 2000);
     } else {

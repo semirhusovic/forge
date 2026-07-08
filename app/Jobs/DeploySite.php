@@ -5,9 +5,11 @@ namespace App\Jobs;
 use App\Enums\DeploymentStatus;
 use App\Models\Deployment;
 use App\Services\ShellRunner;
+use DateTime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Throwable;
 
 class DeploySite implements ShouldQueue
 {
@@ -15,9 +17,16 @@ class DeploySite implements ShouldQueue
 
     public int $timeout = 1800;
 
-    public int $tries = 1;
-
     public function __construct(public Deployment $deployment) {}
+
+    /**
+     * Each 30s release while waiting on the per-site lock counts as an
+     * attempt, so the job is bounded by time rather than a tries count.
+     */
+    public function retryUntil(): DateTime
+    {
+        return now()->addHour();
+    }
 
     /** @return array<int, object> */
     public function middleware(): array
@@ -55,5 +64,11 @@ class DeploySite implements ShouldQueue
             'status' => $result->successful() ? DeploymentStatus::Success : DeploymentStatus::Failed,
             'finished_at' => now(),
         ])->save();
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $this->deployment->appendOutput("\nDEPLOYMENT FAILED: ".($exception?->getMessage() ?? 'unknown error')."\n");
+        $this->deployment->update(['status' => DeploymentStatus::Failed, 'finished_at' => now()]);
     }
 }
