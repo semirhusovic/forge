@@ -64,10 +64,12 @@ return [
             ]) : [],
         ],
 
+        // Privileged connection for creating/dropping managed databases.
         'forge_mysql' => [
             'driver' => 'mysql',
             'host' => env('FORGE_MYSQL_HOST', '127.0.0.1'),
             'port' => env('FORGE_MYSQL_PORT', '3306'),
+            // No default schema — statements target databases by name.
             'database' => '',
             'username' => env('FORGE_MYSQL_USERNAME', 'forge_admin'),
             'password' => env('FORGE_MYSQL_PASSWORD', ''),
