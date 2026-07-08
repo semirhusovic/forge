@@ -26,7 +26,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Sites',
-        href: sitesIndex().url,
+        href: sitesIndex(),
         icon: Globe,
     },
 ];
