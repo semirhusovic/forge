@@ -48,6 +48,9 @@ class ShellRunner
     }
 
     /**
+     * The exception message includes the full command and its output, which
+     * may end up in logs — never embed secrets in command strings.
+     *
      * @throws RuntimeException when the command exits non-zero
      */
     public function runOrFail(string $command, ?string $cwd = null, int $timeout = 1800, ?callable $onOutput = null): ShellResult
@@ -68,12 +71,18 @@ class ShellRunner
     public function writeAsRoot(string $contents, string $destination): void
     {
         if ($this->isFake()) {
-            Log::info("[fake-shell] write {$destination}", ['contents' => $contents]);
+            // Contents may hold secrets (.env files) — log size only.
+            Log::info("[fake-shell] write {$destination}", ['bytes' => strlen($contents)]);
 
             return;
         }
 
         $temp = tempnam(sys_get_temp_dir(), 'forge-');
+
+        if ($temp === false) {
+            throw new RuntimeException('Failed to create a temporary file for a privileged write.');
+        }
+
         File::put($temp, $contents);
 
         try {
