@@ -4,12 +4,12 @@ use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DeployScriptController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteInstallController;
+use App\Http\Controllers\WebhookDeployController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
-// Placeholder — real controller lands with the webhook task.
-Route::post('webhook/deploy/{site}/{token}', fn () => abort(404))->name('webhook.deploy');
+Route::post('webhook/deploy/{site}/{token}', WebhookDeployController::class)->name('webhook.deploy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

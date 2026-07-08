@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\DeploymentStatus;
 use App\Models\Deployment;
 use App\Services\ShellRunner;
+use Carbon\Carbon;
 use DateTime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -25,7 +26,7 @@ class DeploySite implements ShouldQueue
      */
     public function retryUntil(): DateTime
     {
-        return now()->addHour();
+        return Carbon::now()->addHour();
     }
 
     /** @return array<int, object> */
