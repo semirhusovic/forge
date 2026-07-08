@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { useForm, router } from '@inertiajs/vue3';
+import { watch } from 'vue';
 import { install as siteInstall } from '@/routes/sites';
+import { store as deploymentsStore } from '@/routes/sites/deployments';
+import { update as deployScriptUpdate } from '@/routes/sites/deploy-script';
 import DeploymentRow from '@/pages/sites/DeploymentRow.vue';
 import type { SiteProps, DeploymentItem } from '../Show.vue';
 
@@ -8,9 +11,17 @@ const props = defineProps<{ site: SiteProps; deployments: DeploymentItem[] }>();
 
 const scriptForm = useForm({ deploy_script: props.site.deploy_script });
 
+watch(
+    () => props.site.deploy_script,
+    (newValue) => {
+        if (!scriptForm.isDirty) {
+            scriptForm.defaults({ deploy_script: newValue }).reset();
+        }
+    },
+);
+
 function saveScript() {
-    // Route lands in Task 8 (sites.deploy-script.update). Stub for now:
-    console.log('deploy script save lands in Task 8');
+    scriptForm.put(deployScriptUpdate(props.site.id).url);
 }
 
 function installRepo() {
@@ -18,8 +29,7 @@ function installRepo() {
 }
 
 function deployNow() {
-    // Route lands in Task 8 (sites.deployments.store). Stub for now:
-    console.log('deploy now lands in Task 8');
+    router.post(deploymentsStore(props.site.id).url);
 }
 </script>
 
