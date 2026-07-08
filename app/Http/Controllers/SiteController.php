@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\GenerateSiteDeployKey;
 use App\Http\Requests\StoreSiteRequest;
 use App\Models\Site;
+use App\Services\EnvFileManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -50,7 +51,7 @@ class SiteController extends Controller
                 'id', 'site_id', 'status', 'trigger', 'commit_hash', 'commit_message', 'created_at', 'finished_at',
             ]),
             'workers' => $site->workers()->get(['id', 'command', 'status']),
-            // 'envContent' => Inertia::optional(fn () => app(\App\Services\EnvFileManager::class)->read($site)), // uncommented in Task 10
+            'envContent' => Inertia::optional(fn () => app(EnvFileManager::class)->read($site)),
         ]);
     }
 
