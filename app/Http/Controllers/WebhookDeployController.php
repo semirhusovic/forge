@@ -24,7 +24,7 @@ class WebhookDeployController extends Controller
 
         $ref = $request->input('ref');
 
-        if (is_string($ref) && $ref !== 'refs/heads/'.$site->branch) {
+        if (! is_string($ref) || $ref !== 'refs/heads/'.$site->branch) {
             return response()->json(['status' => 'ignored', 'reason' => 'branch mismatch']);
         }
 

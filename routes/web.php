@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
-Route::post('webhook/deploy/{site}/{token}', WebhookDeployController::class)->name('webhook.deploy');
+Route::post('webhook/deploy/{site}/{token}', WebhookDeployController::class)
+    ->middleware('throttle:60,1')
+    ->name('webhook.deploy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
