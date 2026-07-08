@@ -64,6 +64,17 @@ return [
             ]) : [],
         ],
 
+        'forge_mysql' => [
+            'driver' => 'mysql',
+            'host' => env('FORGE_MYSQL_HOST', '127.0.0.1'),
+            'port' => env('FORGE_MYSQL_PORT', '3306'),
+            'database' => '',
+            'username' => env('FORGE_MYSQL_USERNAME', 'forge_admin'),
+            'password' => env('FORGE_MYSQL_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),
