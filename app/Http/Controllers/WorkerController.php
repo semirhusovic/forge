@@ -8,6 +8,7 @@ use App\Models\Worker;
 use App\Services\WorkerManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class WorkerController extends Controller
 {
@@ -16,7 +17,7 @@ class WorkerController extends Controller
         abort_unless($site->status === SiteStatus::Installed, 422, 'Install the site first.');
 
         $validated = $request->validate([
-            'command' => ['required', 'string', 'max:200', 'regex:/^queue:work[a-zA-Z0-9:_=. \-]*$/'],
+            'command' => ['required', 'string', 'max:200', 'regex:/^queue:work( [a-zA-Z0-9:_=. \-]*)?$/D'],
         ]);
 
         $worker = $site->workers()->create([
@@ -24,14 +25,24 @@ class WorkerController extends Controller
             'status' => 'running',
         ]);
 
-        $workers->install($worker);
+        try {
+            $workers->install($worker);
+        } catch (RuntimeException $exception) {
+            $worker->delete();
+
+            return back()->with('error', 'Worker install failed: '.$exception->getMessage());
+        }
 
         return back()->with('success', 'Worker created and started.');
     }
 
     public function restart(Site $site, Worker $worker, WorkerManager $workers): RedirectResponse
     {
-        $workers->restart($worker);
+        try {
+            $workers->restart($worker);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', 'Worker restart failed: '.$exception->getMessage());
+        }
 
         return back()->with('success', 'Worker restarted.');
     }
