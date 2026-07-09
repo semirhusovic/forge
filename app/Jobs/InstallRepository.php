@@ -53,7 +53,7 @@ class InstallRepository implements ShouldQueue
             ), onOutput: $log);
 
             $shell->run('cp .env.example .env', cwd: $site->root_path, onOutput: $log);
-            $shell->runOrFail('composer install --no-dev --no-interaction --prefer-dist', cwd: $site->root_path, timeout: 1800, onOutput: $log);
+            $shell->runOrFail('composer update --no-dev --no-interaction --prefer-dist', cwd: $site->root_path, timeout: 1800, onOutput: $log);
             $shell->run(escapeshellarg($php).' artisan key:generate --force', cwd: $site->root_path, onOutput: $log);
 
             $apache->installVhost($site, $log);

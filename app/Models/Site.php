@@ -99,7 +99,7 @@ class Site extends Model
         return <<<BASH
         cd {$rootPath}
         git pull origin {$branch}
-        composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+        composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
         php artisan migrate --force
         php artisan optimize
         BASH;
