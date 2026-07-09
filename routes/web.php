@@ -7,6 +7,7 @@ use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteInstallController;
 use App\Http\Controllers\SslController;
 use App\Http\Controllers\WebhookDeployController;
+use App\Http\Controllers\WorkerController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -24,6 +25,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('sites/{site}/deploy-script', DeployScriptController::class)->name('sites.deploy-script.update');
     Route::put('sites/{site}/env', EnvFileController::class)->name('sites.env.update');
     Route::post('sites/{site}/ssl', SslController::class)->name('sites.ssl.store');
+    Route::post('sites/{site}/workers', [WorkerController::class, 'store'])->name('sites.workers.store');
+    Route::post('sites/{site}/workers/{worker}/restart', [WorkerController::class, 'restart'])->name('sites.workers.restart')->scopeBindings();
+    Route::delete('sites/{site}/workers/{worker}', [WorkerController::class, 'destroy'])->name('sites.workers.destroy')->scopeBindings();
 });
 
 require __DIR__.'/settings.php';

@@ -5,6 +5,7 @@ import { index as sitesIndex } from '@/routes/sites';
 import AppTab from './tabs/AppTab.vue';
 import EnvTab from './tabs/EnvTab.vue';
 import SslTab from './tabs/SslTab.vue';
+import WorkersTab from './tabs/WorkersTab.vue';
 
 export interface SiteProps {
     id: number;
@@ -60,7 +61,7 @@ const page = usePage();
 const currentTab = ref<'app' | 'env' | 'ssl' | 'workers' | 'scheduler'>('app');
 const tabs = ['app', 'env', 'ssl', 'workers', 'scheduler'] as const;
 
-usePoll(3000, { only: ['site', 'deployments'] });
+usePoll(3000, { only: ['site', 'deployments', 'workers'] });
 </script>
 
 <template>
@@ -94,6 +95,7 @@ usePoll(3000, { only: ['site', 'deployments'] });
         <AppTab v-if="currentTab === 'app'" :site="site" :deployments="deployments" />
         <EnvTab v-else-if="currentTab === 'env'" :site="site" :envContent="envContent" />
         <SslTab v-else-if="currentTab === 'ssl'" :site="site" />
+        <WorkersTab v-else-if="currentTab === 'workers'" :site="site" :workers="workers" />
         <div v-else class="text-sm text-muted-foreground">Coming in a later task: {{ currentTab }}</div>
     </div>
 </template>
