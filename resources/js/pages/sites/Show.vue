@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import { index as sitesIndex } from '@/routes/sites';
 import AppTab from './tabs/AppTab.vue';
 import EnvTab from './tabs/EnvTab.vue';
+import SchedulerTab from './tabs/SchedulerTab.vue';
 import SslTab from './tabs/SslTab.vue';
 import WorkersTab from './tabs/WorkersTab.vue';
 
@@ -96,6 +97,6 @@ usePoll(3000, { only: ['site', 'deployments', 'workers'] });
         <EnvTab v-else-if="currentTab === 'env'" :site="site" :envContent="envContent" />
         <SslTab v-else-if="currentTab === 'ssl'" :site="site" />
         <WorkersTab v-else-if="currentTab === 'workers'" :site="site" :workers="workers" />
-        <div v-else class="text-sm text-muted-foreground">Coming in a later task: {{ currentTab }}</div>
+        <SchedulerTab v-else-if="currentTab === 'scheduler'" :site="site" />
     </div>
 </template>
