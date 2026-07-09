@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DeployScriptController;
 use App\Http\Controllers\EnvFileController;
@@ -30,6 +31,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('sites/{site}/workers/{worker}/restart', [WorkerController::class, 'restart'])->name('sites.workers.restart')->scopeBindings();
     Route::delete('sites/{site}/workers/{worker}', [WorkerController::class, 'destroy'])->name('sites.workers.destroy')->scopeBindings();
     Route::put('sites/{site}/scheduler', SchedulerController::class)->name('sites.scheduler.update');
+    Route::resource('databases', DatabaseController::class)->only(['index', 'store', 'destroy']);
 });
 
 require __DIR__.'/settings.php';
