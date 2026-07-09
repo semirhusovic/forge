@@ -5,6 +5,7 @@ use App\Http\Controllers\DeployScriptController;
 use App\Http\Controllers\EnvFileController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteInstallController;
+use App\Http\Controllers\SslController;
 use App\Http\Controllers\WebhookDeployController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('sites/{site}/deployments/{deployment}', [DeploymentController::class, 'show'])->name('sites.deployments.show')->scopeBindings();
     Route::put('sites/{site}/deploy-script', DeployScriptController::class)->name('sites.deploy-script.update');
     Route::put('sites/{site}/env', EnvFileController::class)->name('sites.env.update');
+    Route::post('sites/{site}/ssl', SslController::class)->name('sites.ssl.store');
 });
 
 require __DIR__.'/settings.php';

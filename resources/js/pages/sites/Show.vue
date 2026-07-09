@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import { index as sitesIndex } from '@/routes/sites';
 import AppTab from './tabs/AppTab.vue';
 import EnvTab from './tabs/EnvTab.vue';
+import SslTab from './tabs/SslTab.vue';
 
 export interface SiteProps {
     id: number;
@@ -92,6 +93,7 @@ usePoll(3000, { only: ['site', 'deployments'] });
 
         <AppTab v-if="currentTab === 'app'" :site="site" :deployments="deployments" />
         <EnvTab v-else-if="currentTab === 'env'" :site="site" :envContent="envContent" />
+        <SslTab v-else-if="currentTab === 'ssl'" :site="site" />
         <div v-else class="text-sm text-muted-foreground">Coming in a later task: {{ currentTab }}</div>
     </div>
 </template>
