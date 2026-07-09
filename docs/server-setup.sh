@@ -17,7 +17,16 @@ PANEL_DIR="${PANEL_DIR:-/home/forge/panel}"
 apt-get update
 apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
     php-mbstring php-zip php-sqlite3 composer git certbot python3-certbot-apache \
-    mysql-server
+    mysql-server curl ca-certificates gnupg
+
+# --- node.js ---------------------------------------------------------------
+# Site deploy scripts (and the panel's own frontend) build assets with
+# `npm ci && npm run build`, so install Node LTS via NodeSource. Idempotent:
+# skip the repo setup when Node is already installed.
+if ! command -v node >/dev/null 2>&1; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y nodejs
+fi
 
 # --- forge user ------------------------------------------------------------
 if ! id "$FORGE_USER" &>/dev/null; then
