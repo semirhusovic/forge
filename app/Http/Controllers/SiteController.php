@@ -34,7 +34,14 @@ class SiteController extends Controller
             'deploy_script' => Site::defaultDeployScript($rootPath, $request->validated('branch')),
         ]);
 
-        $generateKey->handle($site);
+        try {
+            $generateKey->handle($site);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $site->delete();
+
+            return back()->with('error', 'Deploy key generation failed: '.$exception->getMessage());
+        }
 
         return to_route('sites.show', $site)->with('success', 'Site created. Add the deploy key and webhook to GitHub, then install the repository.');
     }

@@ -8,6 +8,10 @@
         Require all granted
     </Directory>
 
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php-fpm-forge.sock|fcgi://localhost"
+    </FilesMatch>
+
     ErrorLog ${APACHE_LOG_DIR}/{{ $site->domain }}-error.log
     CustomLog ${APACHE_LOG_DIR}/{{ $site->domain }}-access.log combined
 </VirtualHost>

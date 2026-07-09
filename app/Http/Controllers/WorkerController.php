@@ -28,6 +28,7 @@ class WorkerController extends Controller
         try {
             $workers->install($worker);
         } catch (RuntimeException $exception) {
+            $workers->remove($worker);
             $worker->delete();
 
             return back()->with('error', 'Worker install failed: '.$exception->getMessage());

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\SiteStatus;
 use App\Models\Site;
 use App\Services\EnvFileManager;
 use Illuminate\Http\RedirectResponse;
@@ -11,6 +12,8 @@ class EnvFileController extends Controller
 {
     public function __invoke(Request $request, Site $site, EnvFileManager $envFiles): RedirectResponse
     {
+        abort_unless($site->status === SiteStatus::Installed, 422, 'Install the site first.');
+
         $validated = $request->validate([
             'content' => ['present', 'string', 'max:20000'],
         ]);

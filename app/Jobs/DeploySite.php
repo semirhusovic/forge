@@ -56,7 +56,7 @@ class DeploySite implements ShouldQueue
 
         $commit = $shell->run("git log -1 --pretty=format:'%H|%s'", cwd: $site->root_path);
 
-        if ($commit->successful() && str_contains($commit->output, '|')) {
+        if (! $shell->isFake() && $commit->successful() && str_contains($commit->output, '|')) {
             [$hash, $message] = explode('|', trim($commit->output), 2);
             $deployment->fill(['commit_hash' => $hash, 'commit_message' => $message]);
         }

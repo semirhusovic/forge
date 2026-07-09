@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { index as sitesIndex, show as siteShow, store as sitesStore } from '@/routes/sites';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { destroy as sitesDestroy, index as sitesIndex, show as siteShow, store as sitesStore } from '@/routes/sites';
 
 interface SiteListItem {
     id: number;
@@ -30,6 +30,12 @@ const form = useForm({
 function submit() {
     form.post(sitesStore().url);
 }
+
+function removeSite(site: SiteListItem) {
+    if (confirm(`Remove "${site.domain}" from the panel? Vhost, workers and scheduler are torn down; files stay on disk.`)) {
+        router.delete(sitesDestroy(site.id).url);
+    }
+}
 </script>
 
 <template>
@@ -38,6 +44,9 @@ function submit() {
     <div class="flex flex-col gap-6 p-4">
         <div v-if="page.props.flash?.success" class="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800">
             {{ page.props.flash.success }}
+        </div>
+        <div v-if="page.props.flash?.error" class="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+            {{ page.props.flash.error }}
         </div>
 
         <form class="flex flex-col gap-3 rounded-xl border p-4 md:max-w-xl" @submit.prevent="submit">
@@ -74,6 +83,7 @@ function submit() {
                     <th>Branch</th>
                     <th>Status</th>
                     <th>SSL</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -85,9 +95,12 @@ function submit() {
                     <td>{{ site.branch }}</td>
                     <td>{{ site.status }}</td>
                     <td>{{ site.ssl_enabled ? 'yes' : 'no' }}</td>
+                    <td>
+                        <button @click="removeSite(site)" class="rounded border border-red-300 px-3 py-1 text-sm text-red-700">Delete</button>
+                    </td>
                 </tr>
                 <tr v-if="!sites.length">
-                    <td colspan="5" class="py-4 text-muted-foreground">No sites yet.</td>
+                    <td colspan="6" class="py-4 text-muted-foreground">No sites yet.</td>
                 </tr>
             </tbody>
         </table>
