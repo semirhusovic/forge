@@ -2519,7 +2519,7 @@ forge ALL=(root) NOPASSWD: /usr/bin/chmod 644 /etc/systemd/system/forge-worker-*
 forge ALL=(root) NOPASSWD: /usr/bin/chmod 644 /etc/cron.d/forge-site-*
 forge ALL=(root) NOPASSWD: /usr/bin/rm /etc/apache2/sites-available/*
 forge ALL=(root) NOPASSWD: /usr/bin/rm /etc/systemd/system/forge-worker-*
-forge ALL=(root) NOPASSWD: /usr/bin/rm /etc/cron.d/forge-site-*
+forge ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/cron.d/forge-site-*
 SUDOERS
 chmod 440 /etc/sudoers.d/forge-panel
 visudo -cf /etc/sudoers.d/forge-panel

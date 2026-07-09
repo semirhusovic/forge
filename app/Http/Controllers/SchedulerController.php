@@ -6,6 +6,7 @@ use App\Enums\SiteStatus;
 use App\Models\Site;
 use App\Services\SchedulerManager;
 use Illuminate\Http\RedirectResponse;
+use RuntimeException;
 
 class SchedulerController extends Controller
 {
@@ -13,8 +14,16 @@ class SchedulerController extends Controller
     {
         abort_unless($site->status === SiteStatus::Installed, 422, 'Install the site first.');
 
-        $site->has_scheduler ? $scheduler->disable($site) : $scheduler->enable($site);
+        try {
+            if ($site->has_scheduler) {
+                $scheduler->disable($site);
+            } else {
+                $scheduler->enable($site);
+            }
+        } catch (RuntimeException $exception) {
+            return back()->with('error', 'Scheduler update failed: '.$exception->getMessage());
+        }
 
-        return back()->with('success', $site->refresh()->has_scheduler ? 'Scheduler enabled.' : 'Scheduler disabled.');
+        return back()->with('success', $site->has_scheduler ? 'Scheduler enabled.' : 'Scheduler disabled.');
     }
 }

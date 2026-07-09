@@ -17,9 +17,14 @@ class SchedulerManager
         $site->update(['has_scheduler' => true]);
     }
 
+    /**
+     * A leftover cron file keeps executing every minute, so removal must be
+     * verified before the flag flips — unlike best-effort systemd cleanup.
+     * `-f` keeps it idempotent; the sudoers whitelist includes the flag.
+     */
     public function disable(Site $site): void
     {
-        $this->shell->run('sudo rm '.escapeshellarg($this->cronPath($site)));
+        $this->shell->runOrFail('sudo rm -f '.escapeshellarg($this->cronPath($site)));
         $site->update(['has_scheduler' => false]);
     }
 
