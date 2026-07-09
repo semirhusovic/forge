@@ -21,9 +21,12 @@ apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
 
 # --- node.js ---------------------------------------------------------------
 # Site deploy scripts (and the panel's own frontend) build assets with
-# `npm ci && npm run build`, so install Node LTS via NodeSource. Idempotent:
-# skip the repo setup when Node is already installed.
-if ! command -v node >/dev/null 2>&1; then
+# `npm ci && npm run build`, so install Node LTS via NodeSource. Deploys run as
+# the forge user via a systemd worker, which only sees system binaries — a
+# root-local nvm install is invisible to it. So gate on the system-wide binary
+# (/usr/bin/node), NOT `command -v node`, which would match root's nvm copy and
+# wrongly skip the install.
+if [ ! -x /usr/bin/node ]; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
 fi
