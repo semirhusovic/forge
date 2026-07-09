@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Manages MySQL databases and users for deployed applications.
@@ -26,9 +27,18 @@ class ManagedDatabaseManager
         $connection = $this->connection();
 
         $connection->statement("CREATE DATABASE `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $connection->statement("CREATE USER '{$username}'@'localhost' IDENTIFIED BY ".$connection->getPdo()->quote($password));
-        $connection->statement("GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$username}'@'localhost'");
-        $connection->statement('FLUSH PRIVILEGES');
+
+        try {
+            $connection->statement("CREATE USER '{$username}'@'localhost' IDENTIFIED BY ".$connection->getPdo()->quote($password));
+            $connection->statement("GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$username}'@'localhost'");
+            $connection->statement('FLUSH PRIVILEGES');
+        } catch (Throwable $exception) {
+            // Remove only the database created in this call so a failed user
+            // step doesn't leave the name wedged (panel says free, MySQL says taken).
+            $connection->statement("DROP DATABASE IF EXISTS `{$name}`");
+
+            throw $exception;
+        }
     }
 
     public function drop(string $name, string $username): void
