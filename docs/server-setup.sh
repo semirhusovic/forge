@@ -23,11 +23,16 @@ touch "$FORGE_HOME/.ssh/config"
 chown -R "$FORGE_USER:$FORGE_USER" "$FORGE_HOME/.ssh"
 chmod 700 "$FORGE_HOME/.ssh"
 
-# Pre-trust GitHub's host keys so git clone doesn't prompt.
-sudo -u "$FORGE_USER" bash -c "ssh-keyscan github.com >> $FORGE_HOME/.ssh/known_hosts 2>/dev/null"
+# Pre-trust GitHub's host keys so git clone doesn't prompt (idempotent on re-runs).
+if ! grep -qs '^github\.com' "$FORGE_HOME/.ssh/known_hosts"; then
+    sudo -u "$FORGE_USER" bash -c "ssh-keyscan github.com >> $FORGE_HOME/.ssh/known_hosts 2>/dev/null"
+fi
 
 # --- sudoers whitelist -----------------------------------------------------
-cat > /etc/sudoers.d/forge-panel <<'SUDOERS'
+# Written to a temp file and validated before installing, so a bad edit can
+# never brick sudo host-wide.
+SUDOERS_TMP="$(mktemp)"
+cat > "$SUDOERS_TMP" <<'SUDOERS'
 forge ALL=(root) NOPASSWD: /usr/sbin/a2ensite *
 forge ALL=(root) NOPASSWD: /usr/sbin/a2dissite *
 forge ALL=(root) NOPASSWD: /usr/sbin/apache2ctl configtest
@@ -49,8 +54,9 @@ forge ALL=(root) NOPASSWD: /usr/bin/rm /etc/apache2/sites-available/*
 forge ALL=(root) NOPASSWD: /usr/bin/rm /etc/systemd/system/forge-worker-*
 forge ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/cron.d/forge-site-*
 SUDOERS
-chmod 440 /etc/sudoers.d/forge-panel
-visudo -cf /etc/sudoers.d/forge-panel
+visudo -cf "$SUDOERS_TMP"
+install -m 440 "$SUDOERS_TMP" /etc/sudoers.d/forge-panel
+rm -f "$SUDOERS_TMP"
 
 # --- privileged mysql user for managed databases ---------------------------
 echo

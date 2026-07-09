@@ -33,10 +33,22 @@ class ApacheManager
         $this->shell->runOrFail('sudo systemctl reload apache2', onOutput: $onOutput);
     }
 
+    /**
+     * Best-effort removal of both vhosts: certbot --apache creates a second
+     * {domain}-le-ssl.conf, and its cert must be deleted too or the renewal
+     * timer keeps the removed site alive on 443 (then fails noisily forever).
+     */
     public function removeVhost(Site $site): void
     {
         $this->shell->run(sprintf('sudo a2dissite %s', escapeshellarg("{$site->domain}.conf")));
+        $this->shell->run(sprintf('sudo a2dissite %s', escapeshellarg("{$site->domain}-le-ssl.conf")));
         $this->shell->run(sprintf('sudo rm %s', escapeshellarg("/etc/apache2/sites-available/{$site->domain}.conf")));
+        $this->shell->run(sprintf('sudo rm %s', escapeshellarg("/etc/apache2/sites-available/{$site->domain}-le-ssl.conf")));
+
+        if ($site->ssl_enabled) {
+            $this->shell->run(sprintf('sudo certbot delete --cert-name %s --non-interactive', escapeshellarg($site->domain)));
+        }
+
         $this->shell->run('sudo systemctl reload apache2');
     }
 }
