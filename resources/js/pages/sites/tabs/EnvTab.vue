@@ -31,10 +31,19 @@ function save() {
 <template>
     <div class="flex flex-col gap-2 rounded-xl border p-4">
         <h2 class="font-semibold">.env</h2>
-        <div v-if="envContent === undefined" class="h-64 animate-pulse rounded bg-muted"></div>
+        <div
+            v-if="envContent === undefined"
+            class="h-64 animate-pulse rounded bg-muted"
+        ></div>
         <template v-else>
-            <textarea v-model="form.content" rows="20" class="w-full rounded border p-2 font-mono text-xs"></textarea>
-            <span v-if="form.errors.content" class="text-sm text-red-600">{{ form.errors.content }}</span>
+            <textarea
+                v-model="form.content"
+                rows="20"
+                class="w-full rounded border p-2 font-mono text-xs"
+            ></textarea>
+            <span v-if="form.errors.content" class="text-sm text-red-600">{{
+                form.errors.content
+            }}</span>
             <button
                 @click="save"
                 :disabled="form.processing"

@@ -14,15 +14,25 @@ function toggle() {
     <div class="flex flex-col gap-3 rounded-xl border p-4">
         <h2 class="font-semibold">Scheduler</h2>
         <p class="text-sm text-muted-foreground">
-            Runs <code>php artisan schedule:run</code> every minute via a cron entry in <code>/etc/cron.d</code>.
+            Runs <code>php artisan schedule:run</code> every minute via a cron
+            entry in <code>/etc/cron.d</code>.
         </p>
         <div class="text-sm">
             Status:
-            <span :class="site.has_scheduler ? 'text-green-700' : 'text-muted-foreground'">
+            <span
+                :class="
+                    site.has_scheduler
+                        ? 'text-green-700'
+                        : 'text-muted-foreground'
+                "
+            >
                 {{ site.has_scheduler ? 'enabled' : 'disabled' }}
             </span>
         </div>
-        <button @click="toggle" class="self-start rounded bg-black px-4 py-2 text-sm text-white dark:bg-white dark:text-black">
+        <button
+            @click="toggle"
+            class="self-start rounded bg-black px-4 py-2 text-sm text-white dark:bg-white dark:text-black"
+        >
             {{ site.has_scheduler ? 'Disable scheduler' : 'Enable scheduler' }}
         </button>
     </div>

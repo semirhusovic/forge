@@ -22,11 +22,11 @@
         {{-- Inline style to set the HTML background color based on our theme in app.css --}}
         <style>
             html {
-                background-color: oklch(1 0 0);
+                background-color: oklch(0.991 0.006 75);
             }
 
             html.dark {
-                background-color: oklch(0.145 0 0);
+                background-color: oklch(0.16 0.008 55);
             }
         </style>
 
@@ -35,6 +35,10 @@
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
         @fonts
+        <link rel="preconnect" href="https://fonts.bunny.net">
+        <link href="https://fonts.bunny.net/css?family=bricolage-grotesque:500,600,700,800|jetbrains-mono:400,500,600" rel="stylesheet">
+        <meta name="theme-color" content="#e8590c">
+        <meta name="theme-color" content="#0e0b09" media="(prefers-color-scheme: dark)">
 
         @vite(['resources/css/app.css', 'resources/js/app.ts', "resources/js/pages/{$page['component']}.vue"])
         <x-inertia::head>

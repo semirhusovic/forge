@@ -19,6 +19,8 @@ class ShellRunner
      */
     public function run(string $command, ?string $cwd = null, int $timeout = 1800, ?callable $onOutput = null): ShellResult
     {
+        $command = $this->nonInteractiveSudo($command);
+
         if ($this->isFake()) {
             $line = '[fake-shell] $ '.$command."\n";
             Log::info($line, ['cwd' => $cwd]);
@@ -58,10 +60,37 @@ class ShellRunner
         $result = $this->run($command, $cwd, $timeout, $onOutput);
 
         if (! $result->successful()) {
-            throw new RuntimeException("Command failed ({$result->exitCode}): {$command}\n{$result->output}");
+            throw new RuntimeException(
+                "Command failed ({$result->exitCode}): {$command}\n{$result->output}".$this->sudoHint($result->output)
+            );
         }
 
         return $result;
+    }
+
+    /**
+     * Force `sudo` to run non-interactively so a missing NOPASSWD grant fails
+     * immediately instead of blocking on a password prompt with no terminal.
+     */
+    private function nonInteractiveSudo(string $command): string
+    {
+        return preg_replace('/(^|\s)sudo\s+(?!-n\b)/', '$1sudo -n ', $command) ?? $command;
+    }
+
+    /**
+     * When sudo refused for lack of a password, the real cause is almost always
+     * that this process is not running as the `forge` user (whose NOPASSWD
+     * rules live in /etc/sudoers.d/forge-panel). Point the operator at that.
+     */
+    private function sudoHint(string $output): string
+    {
+        if (! str_contains($output, 'password is required') && ! str_contains($output, 'a terminal is required')) {
+            return '';
+        }
+
+        return "\n\nHINT: passwordless sudo was refused. Run the queue worker as the 'forge' user "
+            .'(systemd: User=forge) so the NOPASSWD rules in /etc/sudoers.d/forge-panel apply. '
+            .'Verify with: sudo -l -U forge';
     }
 
     /**
