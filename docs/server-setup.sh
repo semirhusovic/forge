@@ -21,14 +21,29 @@ apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
 
 # --- node.js ---------------------------------------------------------------
 # Site deploy scripts (and the panel's own frontend) build assets with
-# `npm ci && npm run build`, so install Node LTS via NodeSource. Deploys run as
-# the forge user via a systemd worker, which only sees system binaries — a
-# root-local nvm install is invisible to it. So gate on the system-wide binary
-# (/usr/bin/node), NOT `command -v node`, which would match root's nvm copy and
-# wrongly skip the install.
-if [ ! -x /usr/bin/node ]; then
+# `npm ci && npm run build`. Deploys run as the forge user via a systemd
+# worker, which only sees system binaries in the default PATH — a root-local
+# nvm install (/root/.nvm) is unusable (forge can't even traverse /root), so
+# Node MUST live in /usr/bin.
+#
+# Install NodeSource LTS when /usr/bin/node is missing or too old (npm 10+
+# refuses Node < 18, which is the "known not to run" error on stale boxes).
+node_major="$([ -x /usr/bin/node ] && /usr/bin/node -v 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/' || echo 0)"
+if [ "${node_major:-0}" -lt 18 ]; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y nodejs
+fi
+
+# /usr/local/bin precedes /usr/bin on the worker's PATH, so a stray Node there
+# (old tarball / `n` / manual install) hijacks deploys and shadows the good
+# one. With a valid /usr/bin/node in place, drop those shadows so the worker
+# resolves the NodeSource binary.
+if [ -x /usr/bin/node ]; then
+    for b in node npm npx corepack; do
+        if [ -e "/usr/local/bin/$b" ] && [ "$(readlink -f "/usr/local/bin/$b")" != "/usr/bin/$b" ]; then
+            rm -f "/usr/local/bin/$b"
+        fi
+    done
 fi
 
 # --- forge user ------------------------------------------------------------
