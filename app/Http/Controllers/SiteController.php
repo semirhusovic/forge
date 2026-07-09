@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Actions\GenerateSiteDeployKey;
 use App\Http\Requests\StoreSiteRequest;
 use App\Models\Site;
+use App\Services\ApacheManager;
 use App\Services\EnvFileManager;
+use App\Services\SchedulerManager;
+use App\Services\WorkerManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -55,11 +58,33 @@ class SiteController extends Controller
         ]);
     }
 
-    public function destroy(Site $site): RedirectResponse
-    {
-        // Full server-side teardown (vhost, workers, cron) is wired in the final task.
+    public function destroy(
+        Site $site,
+        ApacheManager $apache,
+        WorkerManager $workers,
+        SchedulerManager $scheduler,
+    ): RedirectResponse {
+        foreach ($site->workers as $worker) {
+            $workers->remove($worker);
+        }
+
+        if ($site->has_scheduler) {
+            try {
+                $scheduler->disable($site);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        try {
+            $apache->removeVhost($site);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // Site files in root_path are intentionally left on disk (v1).
         $site->delete();
 
-        return to_route('sites.index')->with('success', 'Site deleted.');
+        return to_route('sites.index')->with('success', 'Site removed from the panel. Files were left on disk.');
     }
 }
