@@ -14,7 +14,11 @@ FORGE_HOME=/home/forge
 PANEL_DIR="${PANEL_DIR:-/home/forge/panel}"
 
 # --- system packages -------------------------------------------------------
-apt-get update
+# --allow-releaseinfo-change: third-party repos already on the box (e.g. the
+# ondrej/php PPA) occasionally rename their Label/Origin metadata, which makes
+# a plain `apt-get update` fail non-interactively and abort the whole script.
+# Package signatures are still verified as usual.
+apt-get update --allow-releaseinfo-change
 apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
     php-mbstring php-zip php-sqlite3 composer git certbot python3-certbot-apache \
     mysql-server curl ca-certificates gnupg
