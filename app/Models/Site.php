@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property string $branch
  * @property string $root_path
  * @property string $web_root_suffix
+ * @property string $php_version
  * @property SiteStatus $status
  * @property string $deploy_script
  * @property bool $auto_deploy
@@ -28,7 +29,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'domain', 'repository', 'branch', 'root_path', 'web_root_suffix',
+    'domain', 'repository', 'branch', 'root_path', 'web_root_suffix', 'php_version',
     'status', 'deploy_script', 'auto_deploy', 'webhook_token',
     'deploy_key_public', 'ssl_enabled', 'ssl_expires_at',
     'has_scheduler', 'provision_log',
@@ -94,14 +95,32 @@ class Site extends Model
         $this->provision_log = ($this->provision_log ?? '').$chunk;
     }
 
-    public static function defaultDeployScript(string $rootPath, string $branch): string
+    /** CLI binary matching the site's PHP version (provisioned by server-setup.sh). */
+    public function phpBinary(): string
     {
+        return "/usr/bin/php{$this->php_version}";
+    }
+
+    /** FPM socket of the versioned forge pool this site's vhost routes through. */
+    public function fpmSocket(): string
+    {
+        return "/run/php/php-fpm-forge-{$this->php_version}.sock";
+    }
+
+    /**
+     * Composer must run under the site's PHP binary — invoked bare, it runs on
+     * the system default and resolves dependencies against the wrong platform.
+     */
+    public static function defaultDeployScript(string $rootPath, string $branch, string $phpVersion): string
+    {
+        $php = "/usr/bin/php{$phpVersion}";
+
         return <<<BASH
         cd {$rootPath}
         git pull origin {$branch}
-        composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
-        php artisan migrate --force
-        php artisan optimize
+        {$php} /usr/bin/composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
+        {$php} artisan migrate --force
+        {$php} artisan optimize
         BASH;
     }
 }

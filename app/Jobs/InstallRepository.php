@@ -36,7 +36,7 @@ class InstallRepository implements ShouldQueue
         $site->update(['status' => SiteStatus::Installing, 'provision_log' => '']);
 
         $log = fn (string $chunk) => $site->appendProvisionLog($chunk);
-        $php = config('forge.php_binary');
+        $php = $site->phpBinary();
 
         try {
             if (! $shell->isFake() && File::isDirectory($site->root_path)) {
@@ -53,7 +53,9 @@ class InstallRepository implements ShouldQueue
             ), onOutput: $log);
 
             $shell->run('cp .env.example .env', cwd: $site->root_path, onOutput: $log);
-            $shell->runOrFail('composer update --no-dev --no-interaction --prefer-dist', cwd: $site->root_path, timeout: 1800, onOutput: $log);
+            // Composer runs under the site's PHP so dependency resolution sees
+            // the same platform the site will run on.
+            $shell->runOrFail(escapeshellarg($php).' /usr/bin/composer update --no-dev --no-interaction --prefer-dist', cwd: $site->root_path, timeout: 1800, onOutput: $log);
             $shell->run(escapeshellarg($php).' artisan key:generate --force', cwd: $site->root_path, onOutput: $log);
 
             $apache->installVhost($site, $log);

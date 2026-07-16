@@ -26,9 +26,14 @@ interface SiteListItem {
     branch: string;
     status: string;
     ssl_enabled: boolean;
+    php_version: string;
 }
 
-defineProps<{ sites: SiteListItem[] }>();
+const props = defineProps<{
+    sites: SiteListItem[];
+    phpVersions: string[];
+    defaultPhpVersion: string;
+}>();
 
 defineOptions({
     layout: {
@@ -43,6 +48,7 @@ const form = useForm({
     domain: '',
     repository: '',
     branch: 'main',
+    php_version: props.defaultPhpVersion,
 });
 
 function submit() {
@@ -170,19 +176,41 @@ function repoShort(repository: string) {
                         >
                     </label>
                 </div>
-                <label class="text-sm font-medium">
-                    Repository (SSH)
-                    <input
-                        v-model="form.repository"
-                        placeholder="git@github.com:user/repo.git"
-                        class="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
-                    />
-                    <span
-                        v-if="form.errors.repository"
-                        class="mt-1 block text-xs text-red-600"
-                        >{{ form.errors.repository }}</span
-                    >
-                </label>
+                <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+                    <label class="text-sm font-medium">
+                        Repository (SSH)
+                        <input
+                            v-model="form.repository"
+                            placeholder="git@github.com:user/repo.git"
+                            class="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        <span
+                            v-if="form.errors.repository"
+                            class="mt-1 block text-xs text-red-600"
+                            >{{ form.errors.repository }}</span
+                        >
+                    </label>
+                    <label class="text-sm font-medium">
+                        PHP version
+                        <select
+                            v-model="form.php_version"
+                            class="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring sm:w-32"
+                        >
+                            <option
+                                v-for="version in phpVersions"
+                                :key="version"
+                                :value="version"
+                            >
+                                PHP {{ version }}
+                            </option>
+                        </select>
+                        <span
+                            v-if="form.errors.php_version"
+                            class="mt-1 block text-xs text-red-600"
+                            >{{ form.errors.php_version }}</span
+                        >
+                    </label>
+                </div>
                 <div class="flex items-center gap-3">
                     <button
                         type="submit"
@@ -257,6 +285,10 @@ function repoShort(repository: string) {
                         <span
                             class="rounded bg-muted px-1.5 py-0.5 font-mono"
                             >{{ site.branch }}</span
+                        >
+                        <span
+                            class="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono"
+                            >PHP {{ site.php_version }}</span
                         >
                     </div>
                     <StatusBadge :status="site.status" />

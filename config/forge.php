@@ -20,8 +20,7 @@ return [
     | Server Paths
     |--------------------------------------------------------------------------
     |
-    | Where managed sites live, where per-site deploy keys are stored, and
-    | the PHP binary used inside site directories (deploys, artisan).
+    | Where managed sites live and where per-site deploy keys are stored.
     |
     */
 
@@ -29,7 +28,20 @@ return [
 
     'ssh_path' => env('FORGE_SSH_PATH', '/home/forge/.ssh'),
 
-    'php_binary' => env('FORGE_PHP_BINARY', '/usr/bin/php'),
+    /*
+    |--------------------------------------------------------------------------
+    | Per-Site PHP Versions
+    |--------------------------------------------------------------------------
+    |
+    | Versions a site can be created with. Each must have a matching FPM pool
+    | and CLI binary provisioned by docs/server-setup.sh (php-fpm-forge-X.Y
+    | socket and /usr/bin/phpX.Y).
+    |
+    */
+
+    'php_versions' => ['8.3', '8.4'],
+
+    'default_php_version' => env('FORGE_DEFAULT_PHP_VERSION', '8.4'),
 
     /*
     |--------------------------------------------------------------------------

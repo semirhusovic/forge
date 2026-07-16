@@ -21,7 +21,31 @@ PANEL_DIR="${PANEL_DIR:-/home/forge/panel}"
 apt-get update --allow-releaseinfo-change
 apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
     php-mbstring php-zip php-sqlite3 composer git certbot python3-certbot-apache \
-    mysql-server curl ca-certificates gnupg
+    mysql-server curl ca-certificates gnupg software-properties-common
+
+# --- per-site php versions ---------------------------------------------------
+# Sites pick their PHP version at creation (config/forge.php 'php_versions').
+# Each version needs a CLI binary (/usr/bin/phpX.Y) for deploys/cron/workers
+# and a forge FPM pool with a versioned socket for the site's vhost. Ubuntu's
+# archive carries only one PHP, so the extra versions come from the ondrej PPA
+# (idempotent to re-add).
+SITE_PHP_VERSIONS="8.3 8.4"
+
+# The panel itself keeps running on the current default /usr/bin/php and the
+# unversioned php-fpm-forge.sock pool. Capture that version BEFORE installing
+# site versions: the new packages would otherwise flip the /usr/bin/php
+# alternative to the newest version, silently moving the panel onto an FPM
+# service whose pool fights over the same socket.
+PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+
+add-apt-repository -y ppa:ondrej/php
+
+for v in $SITE_PHP_VERSIONS; do
+    apt-get install -y "php$v-fpm" "php$v-cli" "php$v-mysql" "php$v-xml" \
+        "php$v-curl" "php$v-mbstring" "php$v-zip" "php$v-sqlite3"
+done
+
+update-alternatives --set php "/usr/bin/php$PHP_VERSION"
 
 # --- node.js ---------------------------------------------------------------
 # Site deploy scripts (and the panel's own frontend) build assets with
@@ -67,12 +91,12 @@ if ! grep -qs '^github\.com' "$FORGE_HOME/.ssh/known_hosts"; then
     sudo -u "$FORGE_USER" bash -c "ssh-keyscan github.com >> $FORGE_HOME/.ssh/known_hosts 2>/dev/null"
 fi
 
-# --- php-fpm pool for the forge user ---------------------------------------
-PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
-
-# PHP runs as the forge user via a dedicated FPM pool: panel requests get the
+# --- php-fpm pools for the forge user ---------------------------------------
+# PHP runs as the forge user via dedicated FPM pools: panel requests get the
 # forge user's sudoers whitelist and SSH config, and deployed sites can write
-# their own storage/ directories.
+# their own storage/ directories. The unversioned socket serves the panel;
+# each site-selectable version gets its own pool and socket that the panel's
+# generated vhosts route through (Site::fpmSocket()).
 cat > "/etc/php/$PHP_VERSION/fpm/pool.d/forge.conf" <<POOL
 [forge]
 user = forge
@@ -87,6 +111,22 @@ pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 POOL
 
+for v in $SITE_PHP_VERSIONS; do
+    cat > "/etc/php/$v/fpm/pool.d/forge-site.conf" <<POOL
+[forge-$v]
+user = forge
+group = forge
+listen = /run/php/php-fpm-forge-$v.sock
+listen.owner = www-data
+listen.group = www-data
+pm = dynamic
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+POOL
+done
+
 # The stock Ubuntu php-fpm unit sets ProtectSystem=full, which mounts /etc
 # read-only for php-fpm AND everything it spawns — including the panel's
 # whitelisted sudo calls. Long provisioning jobs run in the queue worker (see
@@ -95,15 +135,20 @@ POOL
 # /etc and fail with "Read-only file system" without these carve-outs. The
 # sudoers whitelist below remains the actual gate on what gets written; the
 # `-` prefix skips paths that don't exist yet so the unit still starts.
-mkdir -p "/etc/systemd/system/php$PHP_VERSION-fpm.service.d"
-cat > "/etc/systemd/system/php$PHP_VERSION-fpm.service.d/forge-writable-paths.conf" <<'DROPIN'
+for v in $(printf '%s\n' "$PHP_VERSION" $SITE_PHP_VERSIONS | sort -u); do
+    mkdir -p "/etc/systemd/system/php$v-fpm.service.d"
+    cat > "/etc/systemd/system/php$v-fpm.service.d/forge-writable-paths.conf" <<'DROPIN'
 [Service]
 ReadWritePaths=-/etc/apache2/sites-available -/etc/apache2/sites-enabled -/etc/systemd/system -/etc/cron.d
 DROPIN
+done
 
 a2enmod rewrite proxy_fcgi setenvif
 systemctl daemon-reload
-systemctl restart "php$PHP_VERSION-fpm"
+for v in $(printf '%s\n' "$PHP_VERSION" $SITE_PHP_VERSIONS | sort -u); do
+    systemctl enable --now "php$v-fpm"
+    systemctl restart "php$v-fpm"
+done
 systemctl restart apache2
 
 # --- sudoers whitelist -----------------------------------------------------

@@ -25,6 +25,7 @@ export interface SiteProps {
     branch: string;
     root_path: string;
     status: string;
+    php_version: string;
     deploy_script: string;
     auto_deploy: boolean;
     deploy_key_public: string | null;
@@ -130,6 +131,7 @@ usePoll(3000, { only: ['site', 'deployments', 'workers'] });
                             ><Lock class="size-3.5" />
                             {{ site.ssl_enabled ? 'HTTPS' : 'HTTP only' }}</span
                         >
+                        <span class="font-mono">PHP {{ site.php_version }}</span>
                         <span class="truncate font-mono">{{
                             site.root_path
                         }}</span>

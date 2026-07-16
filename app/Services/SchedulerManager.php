@@ -10,7 +10,7 @@ class SchedulerManager
 
     public function enable(Site $site): void
     {
-        $php = config('forge.php_binary');
+        $php = $site->phpBinary();
         $cron = "* * * * * forge {$php} {$site->root_path}/artisan schedule:run >> /dev/null 2>&1\n";
 
         $this->shell->writeAsRoot($cron, $this->cronPath($site));

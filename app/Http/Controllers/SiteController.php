@@ -19,7 +19,9 @@ class SiteController extends Controller
     public function index(): Response
     {
         return Inertia::render('sites/Index', [
-            'sites' => Site::query()->latest()->get(['id', 'domain', 'repository', 'branch', 'status', 'ssl_enabled']),
+            'sites' => Site::query()->latest()->get(['id', 'domain', 'repository', 'branch', 'status', 'ssl_enabled', 'php_version']),
+            'phpVersions' => config('forge.php_versions'),
+            'defaultPhpVersion' => config('forge.default_php_version'),
         ]);
     }
 
@@ -31,7 +33,7 @@ class SiteController extends Controller
             ...$request->validated(),
             'root_path' => $rootPath,
             'webhook_token' => Str::random(48),
-            'deploy_script' => Site::defaultDeployScript($rootPath, $request->validated('branch')),
+            'deploy_script' => Site::defaultDeployScript($rootPath, $request->validated('branch'), $request->validated('php_version')),
         ]);
 
         try {
@@ -52,7 +54,7 @@ class SiteController extends Controller
             'site' => [
                 ...$site->only([
                     'id', 'domain', 'repository', 'branch', 'root_path', 'status',
-                    'deploy_script', 'auto_deploy', 'deploy_key_public',
+                    'php_version', 'deploy_script', 'auto_deploy', 'deploy_key_public',
                     'ssl_enabled', 'ssl_expires_at', 'has_scheduler', 'provision_log',
                 ]),
                 'webhook_url' => $site->webhookUrl(),

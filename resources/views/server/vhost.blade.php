@@ -9,7 +9,7 @@
     </Directory>
 
     <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php-fpm-forge.sock|fcgi://localhost"
+        SetHandler "proxy:unix:{{ $site->fpmSocket() }}|fcgi://localhost"
     </FilesMatch>
 
     ErrorLog ${APACHE_LOG_DIR}/{{ $site->domain }}-error.log

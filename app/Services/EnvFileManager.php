@@ -23,7 +23,7 @@ class EnvFileManager
         File::ensureDirectoryExists(dirname($path));
         File::put($path, $content);
 
-        $this->shell->run(escapeshellarg(config('forge.php_binary')).' artisan optimize:clear', cwd: $site->root_path);
+        $this->shell->run(escapeshellarg($site->phpBinary()).' artisan optimize:clear', cwd: $site->root_path);
     }
 
     private function path(Site $site): string
