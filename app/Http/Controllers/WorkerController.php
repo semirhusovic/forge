@@ -16,8 +16,10 @@ class WorkerController extends Controller
     {
         abort_unless($site->status === SiteStatus::Installed, 422, 'Install the site first.');
 
+        // Only long-running artisan commands make sense as workers: queue
+        // consumers and the Inertia SSR server.
         $validated = $request->validate([
-            'command' => ['required', 'string', 'max:200', 'regex:/^queue:work( [a-zA-Z0-9:_=. \-]*)?$/D'],
+            'command' => ['required', 'string', 'max:200', 'regex:/^(queue:work( [a-zA-Z0-9:_=. \-]*)?|inertia:start-ssr( [a-zA-Z0-9:_=. \-]*)?)$/D'],
         ]);
 
         $worker = $site->workers()->create([

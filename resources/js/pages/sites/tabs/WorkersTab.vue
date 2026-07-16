@@ -9,7 +9,12 @@ import type { SiteProps, WorkerItem } from '../Show.vue';
 
 const props = defineProps<{ site: SiteProps; workers: WorkerItem[] }>();
 
-const form = useForm({ command: 'queue:work --tries=3' });
+const presets = [
+    { label: 'Queue worker', command: 'queue:work --tries=3' },
+    { label: 'Inertia SSR', command: 'inertia:start-ssr' },
+];
+
+const form = useForm({ command: presets[0].command });
 
 function create() {
     form.post(workersStore(props.site.id).url, {
@@ -34,6 +39,24 @@ function remove(worker: WorkerItem) {
             @submit.prevent="create"
             class="flex items-end gap-2 rounded-xl border p-4"
         >
+            <label class="text-sm">
+                Type
+                <select
+                    class="mt-1 w-full rounded border px-2 py-1.5 text-xs"
+                    @change="
+                        form.command = ($event.target as HTMLSelectElement)
+                            .value
+                    "
+                >
+                    <option
+                        v-for="preset in presets"
+                        :key="preset.command"
+                        :value="preset.command"
+                    >
+                        {{ preset.label }}
+                    </option>
+                </select>
+            </label>
             <label class="flex-1 text-sm">
                 Artisan command
                 <input
