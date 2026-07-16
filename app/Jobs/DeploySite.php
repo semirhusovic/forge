@@ -46,7 +46,7 @@ class DeploySite implements ShouldQueue
 
         $deployment->update(['status' => DeploymentStatus::Running, 'started_at' => now()]);
 
-        $script = "set -e\n".$site->deploy_script;
+        $script = "set -e\nexport PATH=\"{$site->phpShimDir()}:\$PATH\"\n".$site->deploy_script;
 
         $result = $shell->run(
             $script,

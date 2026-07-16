@@ -40,12 +40,24 @@ PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
 
 add-apt-repository -y ppa:ondrej/php
 
+# intl is required by the apt composer binary itself (Symfony's string helpers
+# need the Normalizer class once install progress rendering kicks in) and by
+# many Laravel apps.
 for v in $SITE_PHP_VERSIONS; do
     apt-get install -y "php$v-fpm" "php$v-cli" "php$v-mysql" "php$v-xml" \
-        "php$v-curl" "php$v-mbstring" "php$v-zip" "php$v-sqlite3"
+        "php$v-curl" "php$v-mbstring" "php$v-zip" "php$v-sqlite3" "php$v-intl"
 done
 
 update-alternatives --set php "/usr/bin/php$PHP_VERSION"
+
+# Bare `php` inside a deploy — including commands spawned by build tooling the
+# panel cannot rewrite (e.g. Vite's wayfinder plugin runs `php artisan`) —
+# must resolve to the site's version, not the system default. The deploy job
+# prepends /opt/forge/php/<version> to PATH; these shims are what it finds.
+for v in $SITE_PHP_VERSIONS; do
+    mkdir -p "/opt/forge/php/$v"
+    ln -sf "/usr/bin/php$v" "/opt/forge/php/$v/php"
+done
 
 # --- node.js ---------------------------------------------------------------
 # Site deploy scripts (and the panel's own frontend) build assets with

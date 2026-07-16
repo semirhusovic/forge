@@ -30,7 +30,13 @@ test('server setup script provisions every php version the panel offers for site
 
     expect($script)
         ->toContain('ppa:ondrej/php')
-        ->toContain('listen = /run/php/php-fpm-forge-$v.sock');
+        ->toContain('listen = /run/php/php-fpm-forge-$v.sock')
+        // Without intl the apt composer binary fatals with "Class Normalizer
+        // not found" mid-install when run under the versioned CLIs.
+        ->toContain('"php$v-intl"')
+        // PATH shims DeploySite prepends (Site::phpShimDir) so bare `php`
+        // resolves to the site's version during deploys.
+        ->toContain('ln -sf "/usr/bin/php$v" "/opt/forge/php/$v/php"');
 });
 
 test('server setup script survives third-party repos renaming their release metadata', function () {

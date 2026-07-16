@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\DeploymentStatus;
+use App\Jobs\DeploySite;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\SchedulerManager;
@@ -54,6 +56,18 @@ test('site creation stores the chosen php version and bakes it into the deploy s
         ->and($site->phpBinary())->toBe('/usr/bin/php8.3')
         ->and($site->deploy_script)->toContain('/usr/bin/php8.3 /usr/bin/composer update')
         ->and($site->deploy_script)->toContain('/usr/bin/php8.3 artisan migrate --force');
+});
+
+test('deploys expose the site version as plain `php` via a PATH shim', function () {
+    $site = makeSite('8.3');
+    $deployment = $site->deployments()->create(['status' => DeploymentStatus::Pending, 'trigger' => 'manual']);
+
+    (new DeploySite($deployment))->handle(app(ShellRunner::class));
+
+    // Build tooling spawned by the deploy script (e.g. Vite's wayfinder plugin)
+    // runs bare `php`; the shim keeps that on the site's version instead of the
+    // system default.
+    expect($deployment->refresh()->output)->toContain('export PATH="/opt/forge/php/8.3:$PATH"');
 });
 
 test('vhost routes php through the fpm socket matching the site version', function () {

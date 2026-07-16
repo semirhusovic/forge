@@ -108,6 +108,17 @@ class Site extends Model
     }
 
     /**
+     * Directory holding a `php` symlink to this site's binary (provisioned by
+     * server-setup.sh). Prepended to PATH during deploys so bare `php` — also
+     * when spawned by build tooling like Vite's wayfinder plugin — resolves to
+     * the site's version instead of the system default.
+     */
+    public function phpShimDir(): string
+    {
+        return "/opt/forge/php/{$this->php_version}";
+    }
+
+    /**
      * Composer must run under the site's PHP binary — invoked bare, it runs on
      * the system default and resolves dependencies against the wrong platform.
      */
