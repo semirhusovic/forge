@@ -83,7 +83,22 @@ pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 POOL
 
+# The stock Ubuntu php-fpm unit sets ProtectSystem=full, which mounts /etc
+# read-only for php-fpm AND everything it spawns — including the panel's
+# whitelisted sudo calls. Long provisioning jobs run in the queue worker (see
+# below) and never hit this, but quick in-request actions (queue worker unit
+# files, per-site cron files, vhost cleanup on site delete) write straight to
+# /etc and fail with "Read-only file system" without these carve-outs. The
+# sudoers whitelist below remains the actual gate on what gets written; the
+# `-` prefix skips paths that don't exist yet so the unit still starts.
+mkdir -p "/etc/systemd/system/php$PHP_VERSION-fpm.service.d"
+cat > "/etc/systemd/system/php$PHP_VERSION-fpm.service.d/forge-writable-paths.conf" <<'DROPIN'
+[Service]
+ReadWritePaths=-/etc/apache2/sites-available -/etc/apache2/sites-enabled -/etc/systemd/system -/etc/cron.d
+DROPIN
+
 a2enmod rewrite proxy_fcgi setenvif
+systemctl daemon-reload
 systemctl restart "php$PHP_VERSION-fpm"
 systemctl restart apache2
 
@@ -120,6 +135,29 @@ visudo -cf "$SUDOERS_TMP"
 install -m 440 "$SUDOERS_TMP" /etc/sudoers.d/forge-panel
 rm -f "$SUDOERS_TMP"
 
+# --- privileged mysql user for managed databases ---------------------------
+# The panel provisions per-site databases through 'forge_admin'@'localhost'
+# (the forge_mysql connection in config/database.php). The password is
+# generated once and kept in a root-only file so re-runs are idempotent; it is
+# synced into the panel's .env as FORGE_MYSQL_PASSWORD below. ALTER USER on
+# every run keeps MySQL in agreement with the stored file even if one side was
+# changed by hand. Hex output avoids shell/SQL quoting pitfalls.
+MYSQL_PASSWORD_FILE=/root/.forge-panel-mysql-password
+if [ ! -s "$MYSQL_PASSWORD_FILE" ]; then
+    (umask 077 && openssl rand -hex 24 > "$MYSQL_PASSWORD_FILE")
+fi
+chmod 600 "$MYSQL_PASSWORD_FILE"
+MYSQL_ADMIN_PASSWORD="$(cat "$MYSQL_PASSWORD_FILE")"
+
+# Ubuntu's mysql root account authenticates via auth_socket, so a root shell
+# reaches mysql without a password.
+mysql <<SQL
+CREATE USER IF NOT EXISTS 'forge_admin'@'localhost' IDENTIFIED BY '$MYSQL_ADMIN_PASSWORD';
+ALTER USER 'forge_admin'@'localhost' IDENTIFIED BY '$MYSQL_ADMIN_PASSWORD';
+GRANT ALL PRIVILEGES ON *.* TO 'forge_admin'@'localhost' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+SQL
+
 # --- panel queue worker ----------------------------------------------------
 # Provisioning jobs (git clone, composer, apache vhosts) MUST run in a
 # dedicated worker, not synchronously inside php-fpm. The php-fpm systemd unit
@@ -154,6 +192,13 @@ if [ -f "$PANEL_DIR/artisan" ]; then
         else
             echo 'QUEUE_CONNECTION=database' >> "$PANEL_DIR/.env"
         fi
+        # Hand the panel the mysql admin password generated above (hex-only,
+        # so it is safe inside a sed replacement).
+        if grep -q '^FORGE_MYSQL_PASSWORD=' "$PANEL_DIR/.env"; then
+            sed -i "s/^FORGE_MYSQL_PASSWORD=.*/FORGE_MYSQL_PASSWORD=$MYSQL_ADMIN_PASSWORD/" "$PANEL_DIR/.env"
+        else
+            echo "FORGE_MYSQL_PASSWORD=$MYSQL_ADMIN_PASSWORD" >> "$PANEL_DIR/.env"
+        fi
         sudo -u "$FORGE_USER" php "$PANEL_DIR/artisan" config:clear || true
         # Creates the jobs table; tolerated if the DB is not reachable yet.
         sudo -u "$FORGE_USER" php "$PANEL_DIR/artisan" migrate --force || true
@@ -167,12 +212,12 @@ else
     echo "      systemctl enable --now forge-panel-worker) to start it."
 fi
 
-# --- privileged mysql user for managed databases ---------------------------
 echo
-echo "Create the panel's MySQL admin user (put the password in the panel's .env as FORGE_MYSQL_PASSWORD):"
-echo "  mysql -e \"CREATE USER 'forge_admin'@'localhost' IDENTIFIED BY '<password>'; GRANT ALL PRIVILEGES ON *.* TO 'forge_admin'@'localhost' WITH GRANT OPTION; FLUSH PRIVILEGES;\""
+echo "MySQL admin user 'forge_admin'@'localhost' is provisioned; its password lives"
+echo "in $MYSQL_PASSWORD_FILE and is written to the panel's .env as"
+echo "FORGE_MYSQL_PASSWORD whenever the panel is deployed."
 echo
-echo "Then deploy the panel into $PANEL_DIR (or set PANEL_DIR=... and re-run this"
+echo "Deploy the panel into $PANEL_DIR (or set PANEL_DIR=... and re-run this"
 echo "script), configure its Apache vhost to route the panel's PHP through the forge"
 echo "FPM pool (/run/php/php-fpm-forge.sock), and set FORGE_FAKE_SHELL=false."
 echo "Re-running this script after the panel is deployed starts its queue worker"
