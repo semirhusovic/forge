@@ -64,6 +64,7 @@ class SiteController extends Controller
             ]),
             'workers' => $site->workers()->get(['id', 'command', 'status']),
             'envContent' => Inertia::optional(fn () => app(EnvFileManager::class)->read($site)),
+            'vhostContent' => Inertia::optional(fn () => app(ApacheManager::class)->readVhost($site)),
         ]);
     }
 

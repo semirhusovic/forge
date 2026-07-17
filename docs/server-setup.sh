@@ -156,11 +156,17 @@ DROPIN
 done
 
 # HTTP/2 needs mod_http2 plus an event/worker MPM — mod_http2 refuses to serve
-# h2 under mpm_prefork. Sites run PHP via php-fpm (proxy_fcgi), not mod_php, so
-# nothing pins us to prefork; switch to mpm_event when it isn't already active.
+# h2 under mpm_prefork. A server-wide mod_php pins Apache to prefork and blocks
+# the switch, but sites run PHP via php-fpm (proxy_fcgi), so that mod_php is
+# unused — disable it first, then swap the MPM. Kept non-fatal: if the switch
+# can't happen, the rest of provisioning still succeeds (HTTP/2 just won't be
+# served until it's resolved).
 if ! apache2ctl -M 2>/dev/null | grep -q 'mpm_event_module'; then
-    a2dismod mpm_prefork 2>/dev/null || true
-    a2enmod mpm_event
+    for phpmod in $(a2query -m 2>/dev/null | awk '/^php[0-9]/ {print $1}'); do
+        a2dismod "$phpmod" || true
+    done
+    a2dismod mpm_prefork || true
+    a2enmod mpm_event || echo "WARNING: could not switch Apache to mpm_event; HTTP/2 will not be served."
 fi
 
 # Advertise h2 server-wide (h2 is HTTP/2 over TLS; http1.1 stays the fallback)

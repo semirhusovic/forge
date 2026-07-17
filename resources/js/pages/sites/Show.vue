@@ -8,6 +8,7 @@ import {
     KeyRound,
     Lock,
     Cpu,
+    ServerCog,
 } from '@lucide/vue';
 import { ref } from 'vue';
 import StatusBadge from '@/components/StatusBadge.vue';
@@ -16,6 +17,7 @@ import AppTab from './tabs/AppTab.vue';
 import EnvTab from './tabs/EnvTab.vue';
 import SchedulerTab from './tabs/SchedulerTab.vue';
 import SslTab from './tabs/SslTab.vue';
+import VhostTab from './tabs/VhostTab.vue';
 import WorkersTab from './tabs/WorkersTab.vue';
 
 export interface SiteProps {
@@ -58,6 +60,7 @@ defineProps<{
     deployments: DeploymentItem[];
     workers: WorkerItem[];
     envContent?: string;
+    vhostContent?: string;
 }>();
 
 defineOptions({
@@ -75,6 +78,7 @@ const tabs = [
     { key: 'app', label: 'Application', icon: AppWindow },
     { key: 'env', label: 'Environment', icon: KeyRound },
     { key: 'ssl', label: 'SSL', icon: Lock },
+    { key: 'vhost', label: 'Apache', icon: ServerCog },
     { key: 'workers', label: 'Workers', icon: Cpu },
     { key: 'scheduler', label: 'Scheduler', icon: CalendarClock },
 ] as const;
@@ -179,6 +183,11 @@ usePoll(3000, { only: ['site', 'deployments', 'workers'] });
             :envContent="envContent"
         />
         <SslTab v-else-if="currentTab === 'ssl'" :site="site" />
+        <VhostTab
+            v-else-if="currentTab === 'vhost'"
+            :site="site"
+            :vhostContent="vhostContent"
+        />
         <WorkersTab
             v-else-if="currentTab === 'workers'"
             :site="site"
