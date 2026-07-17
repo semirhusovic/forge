@@ -24,6 +24,14 @@ class WebhookDeployController extends Controller
 
         $ref = $request->input('ref');
 
+        // GitHub's default webhook content type (x-www-form-urlencoded) wraps
+        // the JSON document in a `payload` form field instead of sending it as
+        // the request body.
+        if (! is_string($ref) && is_string($request->input('payload'))) {
+            $payload = json_decode($request->input('payload'), true);
+            $ref = is_array($payload) ? ($payload['ref'] ?? null) : null;
+        }
+
         if (! is_string($ref) || $ref !== 'refs/heads/'.$site->branch) {
             return response()->json(['status' => 'ignored', 'reason' => 'branch mismatch']);
         }
