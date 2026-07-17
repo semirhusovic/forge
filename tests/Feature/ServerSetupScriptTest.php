@@ -17,6 +17,17 @@ test('server setup script carves php-fpm write access into every /etc path the p
         ->toContain('/etc/cron.d');                 // SchedulerManager cron files
 });
 
+test('server setup script enables http/2 for site vhosts', function () {
+    $script = file_get_contents(base_path('docs/server-setup.sh'));
+
+    expect($script)
+        // mod_http2 must be loaded and the h2 protocol advertised globally so
+        // certbot's per-site :443 vhosts negotiate HTTP/2.
+        ->toContain('a2enmod')
+        ->toMatch('/a2enmod[^\n]*\bhttp2\b/')
+        ->toContain('Protocols h2 http1.1');
+});
+
 test('server setup script provisions every php version the panel offers for sites', function () {
     $script = file_get_contents(base_path('docs/server-setup.sh'));
 

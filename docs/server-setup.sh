@@ -155,7 +155,24 @@ ReadWritePaths=-/etc/apache2/sites-available -/etc/apache2/sites-enabled -/etc/s
 DROPIN
 done
 
-a2enmod rewrite proxy_fcgi setenvif
+# HTTP/2 needs mod_http2 plus an event/worker MPM — mod_http2 refuses to serve
+# h2 under mpm_prefork. Sites run PHP via php-fpm (proxy_fcgi), not mod_php, so
+# nothing pins us to prefork; switch to mpm_event when it isn't already active.
+if ! apache2ctl -M 2>/dev/null | grep -q 'mpm_event_module'; then
+    a2dismod mpm_prefork 2>/dev/null || true
+    a2enmod mpm_event
+fi
+
+# Advertise h2 server-wide (h2 is HTTP/2 over TLS; http1.1 stays the fallback)
+# so the per-site :443 vhosts certbot generates negotiate HTTP/2 without the
+# panel having to touch those certbot-managed files. Plain :80 vhosts keep
+# HTTP/1.1 since h2c is intentionally not offered.
+cat > /etc/apache2/conf-available/forge-http2.conf <<'HTTP2'
+Protocols h2 http1.1
+HTTP2
+a2enconf forge-http2
+
+a2enmod rewrite proxy_fcgi setenvif http2
 systemctl daemon-reload
 for v in $(printf '%s\n' "$PHP_VERSION" $SITE_PHP_VERSIONS | sort -u); do
     systemctl enable --now "php$v-fpm"
