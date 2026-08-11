@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DatabaseBrowserController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DeployScriptController;
@@ -36,6 +37,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('sites/{site}/workers/{worker}', [WorkerController::class, 'destroy'])->name('sites.workers.destroy')->scopeBindings();
     Route::put('sites/{site}/scheduler', SchedulerController::class)->name('sites.scheduler.update');
     Route::resource('databases', DatabaseController::class)->only(['index', 'store', 'destroy']);
+    Route::get('databases/{database}', [DatabaseBrowserController::class, 'show'])->name('databases.show');
+    Route::post('databases/{database}/query', [DatabaseBrowserController::class, 'query'])->name('databases.query');
 });
 
 require __DIR__.'/settings.php';

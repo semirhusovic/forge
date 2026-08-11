@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
 import {
     Database,
     KeyRound,
@@ -12,6 +12,7 @@ import {
     index as databasesIndex,
     store as databasesStore,
     destroy as databasesDestroy,
+    show as databasesShow,
 } from '@/routes/databases';
 
 interface DatabaseItem {
@@ -165,9 +166,12 @@ function remove(database: DatabaseItem) {
                 :key="database.id"
                 class="grid grid-cols-2 items-center gap-4 border-b border-border px-5 py-3.5 text-sm last:border-0 sm:grid-cols-[1fr_1fr_auto_auto]"
             >
-                <span class="flex items-center gap-2 font-mono font-medium">
+                <Link
+                    :href="databasesShow(database.id).url"
+                    class="flex items-center gap-2 font-mono font-medium hover:text-primary hover:underline"
+                >
                     <Database class="size-4 text-primary" />{{ database.name }}
-                </span>
+                </Link>
                 <span
                     class="flex items-center gap-2 font-mono text-muted-foreground"
                 >
