@@ -8,6 +8,7 @@ import {
     KeyRound,
     Lock,
     Cpu,
+    ScrollText,
     ServerCog,
 } from '@lucide/vue';
 import { ref } from 'vue';
@@ -15,6 +16,7 @@ import StatusBadge from '@/components/StatusBadge.vue';
 import { index as sitesIndex } from '@/routes/sites';
 import AppTab from './tabs/AppTab.vue';
 import EnvTab from './tabs/EnvTab.vue';
+import LogsTab from './tabs/LogsTab.vue';
 import SchedulerTab from './tabs/SchedulerTab.vue';
 import SslTab from './tabs/SslTab.vue';
 import VhostTab from './tabs/VhostTab.vue';
@@ -56,12 +58,28 @@ export interface WorkerItem {
     status: string;
 }
 
+export interface LogFileItem {
+    name: string;
+    size: number;
+    modified_at: string;
+}
+
+export interface LogContent {
+    name: string;
+    content: string;
+    size: number;
+    /** True when the head of the file was cut off to stay within the read cap. */
+    truncated: boolean;
+}
+
 defineProps<{
     site: SiteProps;
     deployments: DeploymentItem[];
     workers: WorkerItem[];
     envContent?: string;
     vhostContent?: string;
+    logFiles?: LogFileItem[];
+    logContent?: LogContent | null;
 }>();
 
 defineOptions({
@@ -80,6 +98,7 @@ const tabs = [
     { key: 'env', label: 'Environment', icon: KeyRound },
     { key: 'ssl', label: 'SSL', icon: Lock },
     { key: 'vhost', label: 'Apache', icon: ServerCog },
+    { key: 'logs', label: 'Logs', icon: ScrollText },
     { key: 'workers', label: 'Workers', icon: Cpu },
     { key: 'scheduler', label: 'Scheduler', icon: CalendarClock },
 ] as const;
@@ -188,6 +207,12 @@ usePoll(3000, { only: ['site', 'deployments', 'workers'] });
             v-else-if="currentTab === 'vhost'"
             :site="site"
             :vhostContent="vhostContent"
+        />
+        <LogsTab
+            v-else-if="currentTab === 'logs'"
+            :site="site"
+            :logFiles="logFiles"
+            :logContent="logContent"
         />
         <WorkersTab
             v-else-if="currentTab === 'workers'"

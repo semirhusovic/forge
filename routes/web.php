@@ -4,6 +4,7 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DeployScriptController;
 use App\Http\Controllers\EnvFileController;
+use App\Http\Controllers\LogFileController;
 use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteInstallController;
@@ -28,6 +29,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('sites/{site}/deploy-script', DeployScriptController::class)->name('sites.deploy-script.update');
     Route::put('sites/{site}/env', EnvFileController::class)->name('sites.env.update');
     Route::put('sites/{site}/vhost', VhostController::class)->name('sites.vhost.update');
+    Route::delete('sites/{site}/logs', [LogFileController::class, 'destroy'])->name('sites.logs.destroy');
     Route::post('sites/{site}/ssl', SslController::class)->name('sites.ssl.store');
     Route::post('sites/{site}/workers', [WorkerController::class, 'store'])->name('sites.workers.store');
     Route::post('sites/{site}/workers/{worker}/restart', [WorkerController::class, 'restart'])->name('sites.workers.restart')->scopeBindings();

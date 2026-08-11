@@ -7,9 +7,11 @@ use App\Http\Requests\StoreSiteRequest;
 use App\Models\Site;
 use App\Services\ApacheManager;
 use App\Services\EnvFileManager;
+use App\Services\LogFileManager;
 use App\Services\SchedulerManager;
 use App\Services\WorkerManager;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -48,7 +50,7 @@ class SiteController extends Controller
         return to_route('sites.show', $site)->with('success', 'Site created. Add the deploy key and webhook to GitHub, then install the repository.');
     }
 
-    public function show(Site $site): Response
+    public function show(Request $request, Site $site): Response
     {
         return Inertia::render('sites/Show', [
             'site' => [
@@ -65,6 +67,10 @@ class SiteController extends Controller
             'workers' => $site->workers()->get(['id', 'command', 'status']),
             'envContent' => Inertia::optional(fn () => app(EnvFileManager::class)->read($site)),
             'vhostContent' => Inertia::optional(fn () => app(ApacheManager::class)->readVhost($site)),
+            'logFiles' => Inertia::optional(fn () => app(LogFileManager::class)->files($site)),
+            'logContent' => Inertia::optional(
+                fn () => app(LogFileManager::class)->tail($site, $request->query('log')),
+            ),
         ]);
     }
 
