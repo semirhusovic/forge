@@ -5,6 +5,8 @@ import { ref, watch } from 'vue';
 import { repositories as githubRepositories } from '@/routes/github';
 import type { Repository } from '@/types';
 
+defineProps<{ id?: string }>();
+
 const emit = defineEmits<{
     (event: 'selected', repository: Repository): void;
 }>();
@@ -104,6 +106,7 @@ function choose() {
         >
             <Search class="ml-3 size-4 shrink-0 text-muted-foreground" />
             <input
+                :id="id"
                 v-model="search"
                 placeholder="Search your repositories…"
                 autocomplete="off"

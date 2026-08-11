@@ -10,7 +10,7 @@ import {
     Server,
     Trash2,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import RepositoryCombobox from '@/components/RepositoryCombobox.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
 import {
@@ -61,6 +61,23 @@ const form = useForm({
 const manualEntry = ref(!props.githubConnected);
 const branches = ref<string[]>([]);
 const branchesLoading = ref(false);
+
+// Whichever direction the mode is toggled, the previously fetched branch
+// list no longer describes the repository the operator is about to pick or
+// type — clear it so the select can't be submitted still holding a branch
+// that belongs to a different repository.
+watch(manualEntry, (isManual) => {
+    branches.value = [];
+    form.branch = '';
+
+    if (!isManual) {
+        // Returning to the picker: RepositoryCombobox remounts with an
+        // empty search box (it has no way to display a prefilled value), so
+        // reset the repository too rather than leave a manually-typed value
+        // the picker can no longer reflect. Everything resets together.
+        form.repository = '';
+    }
+});
 
 // Guards against an older `/github/branches` response landing after a newer
 // selection has already been made (see onRepositorySelected below).
@@ -238,9 +255,9 @@ function repoShort(repository: string) {
                     </label>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
-                    <label class="text-sm font-medium">
-                        <span class="flex items-center justify-between gap-2">
-                            Repository
+                    <div class="text-sm font-medium">
+                        <div class="flex items-center justify-between gap-2">
+                            <label for="site-repository">Repository</label>
                             <button
                                 v-if="githubConnected"
                                 type="button"
@@ -253,13 +270,15 @@ function repoShort(repository: string) {
                                         : 'Enter manually'
                                 }}
                             </button>
-                        </span>
+                        </div>
                         <RepositoryCombobox
                             v-if="githubConnected && !manualEntry"
+                            id="site-repository"
                             @selected="onRepositorySelected"
                         />
                         <input
                             v-else
+                            id="site-repository"
                             v-model="form.repository"
                             placeholder="git@github.com:user/repo.git"
                             class="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -281,7 +300,7 @@ function repoShort(repository: string) {
                             class="field-error"
                             >{{ form.errors.repository }}</span
                         >
-                    </label>
+                    </div>
                     <label class="text-sm font-medium">
                         PHP version
                         <select
