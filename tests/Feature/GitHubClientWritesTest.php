@@ -48,6 +48,26 @@ test('an existing webhook with the same url is reused instead of failing', funct
     expect($this->client->createWebhook('acme/app', 'https://panel.test/webhook/deploy/1/tok'))->toBe(99);
 });
 
+test('creating a deploy key throws when github omits the id', function () {
+    Http::fake(['api.github.com/repos/acme/app/keys' => Http::response(['message' => 'ok'], 201)]);
+
+    expect(fn () => $this->client->createDeployKey('acme/app', 'forge-app.example.com', 'ssh-ed25519 AAAA'))
+        ->toThrow(GitHubApiException::class);
+});
+
+test('a malformed hook in the list is skipped when finding an existing webhook', function () {
+    Http::fake([
+        'api.github.com/repos/acme/app/hooks?*' => Http::response([
+            ['id' => 12], // missing config entirely
+            ['config' => ['url' => 'https://panel.test/webhook/deploy/1/tok']], // missing id
+            ['id' => 99, 'config' => ['url' => 'https://panel.test/webhook/deploy/1/tok']],
+        ]),
+        'api.github.com/repos/acme/app/hooks' => Http::response(['message' => 'Hook already exists on this repository'], 422),
+    ]);
+
+    expect($this->client->createWebhook('acme/app', 'https://panel.test/webhook/deploy/1/tok'))->toBe(99);
+});
+
 test('a 422 with no matching hook still throws', function () {
     Http::fake([
         'api.github.com/repos/acme/app/hooks?*' => Http::response([]),

@@ -123,11 +123,11 @@ class GitHubClient
     /** Read-only by design: the key clones the repository, it never pushes. */
     public function createDeployKey(string $fullName, string $title, string $publicKey): int
     {
-        return (int) $this->post("/repos/{$fullName}/keys", [
+        return $this->extractId($this->post("/repos/{$fullName}/keys", [
             'title' => $title,
             'key' => $publicKey,
             'read_only' => true,
-        ])['id'];
+        ]), 'deploy key');
     }
 
     public function deleteDeployKey(string $fullName, int $id): void
@@ -143,12 +143,12 @@ class GitHubClient
     public function createWebhook(string $fullName, string $url): int
     {
         try {
-            return (int) $this->post("/repos/{$fullName}/hooks", [
+            return $this->extractId($this->post("/repos/{$fullName}/hooks", [
                 'name' => 'web',
                 'active' => true,
                 'events' => ['push'],
                 'config' => ['url' => $url, 'content_type' => 'json', 'insecure_ssl' => '0'],
-            ])['id'];
+            ]), 'webhook');
         } catch (GitHubApiException $exception) {
             $existing = $exception->status === 422 ? $this->findWebhookByUrl($fullName, $url) : null;
 
@@ -156,24 +156,40 @@ class GitHubClient
                 throw $exception;
             }
 
+            // The webhook URL embeds the site id plus a fresh 48-character
+            // random token, so a recreated site never collides with a hook
+            // belonging to a different site. This adoption path is only
+            // reachable when re-provisioning the *same* site, meaning the
+            // hook being adopted is one we created ourselves — its
+            // active/push/json config already matches, so there is nothing
+            // to reconcile with a PATCH.
             return $existing;
         }
-    }
-
-    public function findWebhookByUrl(string $fullName, string $url): ?int
-    {
-        foreach ($this->get("/repos/{$fullName}/hooks", ['per_page' => self::PER_PAGE]) as $hook) {
-            if (($hook['config']['url'] ?? null) === $url) {
-                return (int) $hook['id'];
-            }
-        }
-
-        return null;
     }
 
     public function deleteWebhook(string $fullName, int $id): void
     {
         $this->delete("/repos/{$fullName}/hooks/{$id}");
+    }
+
+    /**
+     * Only the first page (100 hooks) is searched — plenty for adoption
+     * lookups, and it avoids an unbounded scan for repositories with unusually
+     * large hook lists.
+     */
+    private function findWebhookByUrl(string $fullName, string $url): ?int
+    {
+        foreach ($this->get("/repos/{$fullName}/hooks", ['per_page' => self::PER_PAGE]) as $hook) {
+            $id = $hook['id'] ?? null;
+
+            if (! is_int($id) || ($hook['config']['url'] ?? null) !== $url) {
+                continue;
+            }
+
+            return $id;
+        }
+
+        return null;
     }
 
     /**
@@ -197,6 +213,25 @@ class GitHubClient
     private function delete(string $path): void
     {
         $this->send(fn (): Response => $this->request()->delete(self::API.$path));
+    }
+
+    /**
+     * `send()`'s docblock promises every failure surfaces as a
+     * GitHubApiException; without this guard a 2xx response with an
+     * unexpected body would let PHP's E_WARNING-to-ErrorException conversion
+     * escape instead, breaking that promise for callers.
+     *
+     * @param  array<mixed>  $body
+     */
+    private function extractId(array $body, string $context): int
+    {
+        $id = $body['id'] ?? null;
+
+        if (! is_int($id)) {
+            throw new GitHubApiException(502, "GitHub did not return an id for the {$context}.");
+        }
+
+        return $id;
     }
 
     /**
