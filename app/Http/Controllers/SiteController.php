@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Actions\GenerateSiteDeployKey;
+use App\Actions\ProvisionGitHubRepository;
 use App\Http\Requests\StoreSiteRequest;
+use App\Jobs\InstallRepository;
 use App\Models\Site;
 use App\Services\ApacheManager;
 use App\Services\EnvFileManager;
+use App\Services\GitHub\GitHubApiException;
 use App\Services\LogFileManager;
 use App\Services\SchedulerManager;
 use App\Services\WorkerManager;
@@ -18,17 +21,21 @@ use Inertia\Response;
 
 class SiteController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         return Inertia::render('sites/Index', [
             'sites' => Site::query()->latest()->get(['id', 'domain', 'repository', 'branch', 'status', 'ssl_enabled', 'php_version']),
             'phpVersions' => config('forge.php_versions'),
             'defaultPhpVersion' => config('forge.default_php_version'),
+            'githubConnected' => $request->user()->hasGitHubConnection(),
         ]);
     }
 
-    public function store(StoreSiteRequest $request, GenerateSiteDeployKey $generateKey): RedirectResponse
-    {
+    public function store(
+        StoreSiteRequest $request,
+        GenerateSiteDeployKey $generateKey,
+        ProvisionGitHubRepository $provision,
+    ): RedirectResponse {
         $rootPath = rtrim(config('forge.sites_path'), '/').'/'.$request->validated('domain');
 
         $site = Site::create([
@@ -47,7 +54,25 @@ class SiteController extends Controller
             return back()->with('error', 'Deploy key generation failed: '.$exception->getMessage());
         }
 
-        return to_route('sites.show', $site)->with('success', 'Site created. Add the deploy key and webhook to GitHub, then install the repository.');
+        $user = $request->user();
+
+        if (! $user->hasGitHubConnection()) {
+            return to_route('sites.show', $site)
+                ->with('success', 'Site created. Add the deploy key and webhook to GitHub, then install the repository.');
+        }
+
+        try {
+            $provision->handle($site, $user);
+        } catch (GitHubApiException $exception) {
+            report($exception);
+
+            return to_route('sites.show', $site)->with('error', $this->provisionFailureMessage($site, $exception));
+        }
+
+        InstallRepository::dispatch($site);
+
+        return to_route('sites.show', $site)
+            ->with('success', 'Site created — deploy key and webhook installed on GitHub. Installing now.');
     }
 
     public function show(Request $request, Site $site): Response
@@ -102,5 +127,17 @@ class SiteController extends Controller
         $site->delete();
 
         return to_route('sites.index')->with('success', 'Site removed from the panel. Files were left on disk.');
+    }
+
+    /**
+     * Name the step that did not land, so the operator knows which of the two
+     * panels on the site page they still need to copy across by hand.
+     */
+    private function provisionFailureMessage(Site $site, GitHubApiException $exception): string
+    {
+        $missing = $site->github_key_id === null ? 'deploy key' : 'webhook';
+
+        return "Site created, but the {$missing} could not be added to GitHub: {$exception->getMessage()} "
+            .'Add it manually below, then click Install.';
     }
 }
