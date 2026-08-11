@@ -151,6 +151,15 @@ class SiteController extends Controller
 
         $missing = $site->github_key_id === null ? 'deploy key' : 'webhook';
 
+        // A 401 means GitHubClient just cleared the stored token, so the
+        // connection is gone as well — say so, or the operator only finds out
+        // by wandering into the settings page.
+        if ($exception->status === 401) {
+            return "Site created, but the {$missing} could not be added: GitHub rejected the stored token, "
+                .'so the connection was disconnected. Reconnect it in Settings → GitHub, then add the '
+                .'deploy key and webhook manually below and click Install.';
+        }
+
         return "Site created, but the {$missing} could not be added to GitHub: {$exception->getMessage()} "
             .'Add it manually below, then click Install.';
     }

@@ -127,3 +127,20 @@ test('a malformed repository does not falsely blame the deploy key step', functi
     Http::assertNothingSent();
     Queue::assertNotPushed(InstallRepository::class);
 });
+
+test('a rejected token tells the operator the connection was disconnected', function () {
+    Http::fake([
+        'api.github.com/repos/acme/app/keys' => Http::response(['id' => 55], 201),
+        'api.github.com/repos/acme/app/hooks' => Http::response(['message' => 'Bad credentials'], 401),
+    ]);
+
+    $user = connectSiteOwner($this->user);
+
+    $this->actingAs($user)
+        ->post(route('sites.store'), siteAttributes())
+        ->assertRedirect()
+        ->assertSessionHas('error', fn (string $error): bool => str_contains($error, 'disconnected')
+            && str_contains($error, 'Reconnect'));
+
+    expect($user->fresh()->hasGitHubConnection())->toBeFalse();
+});
