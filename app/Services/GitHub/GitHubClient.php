@@ -120,6 +120,62 @@ class GitHubClient
         return (string) ($this->get("/repos/{$fullName}")['default_branch'] ?? 'main');
     }
 
+    /** Read-only by design: the key clones the repository, it never pushes. */
+    public function createDeployKey(string $fullName, string $title, string $publicKey): int
+    {
+        return (int) $this->post("/repos/{$fullName}/keys", [
+            'title' => $title,
+            'key' => $publicKey,
+            'read_only' => true,
+        ])['id'];
+    }
+
+    public function deleteDeployKey(string $fullName, int $id): void
+    {
+        $this->delete("/repos/{$fullName}/keys/{$id}");
+    }
+
+    /**
+     * GitHub answers 422 when a hook with the same URL already exists, which
+     * happens whenever a site is recreated against the same repository. The
+     * existing hook is the one we would have made, so adopt it.
+     */
+    public function createWebhook(string $fullName, string $url): int
+    {
+        try {
+            return (int) $this->post("/repos/{$fullName}/hooks", [
+                'name' => 'web',
+                'active' => true,
+                'events' => ['push'],
+                'config' => ['url' => $url, 'content_type' => 'json', 'insecure_ssl' => '0'],
+            ])['id'];
+        } catch (GitHubApiException $exception) {
+            $existing = $exception->status === 422 ? $this->findWebhookByUrl($fullName, $url) : null;
+
+            if ($existing === null) {
+                throw $exception;
+            }
+
+            return $existing;
+        }
+    }
+
+    public function findWebhookByUrl(string $fullName, string $url): ?int
+    {
+        foreach ($this->get("/repos/{$fullName}/hooks", ['per_page' => self::PER_PAGE]) as $hook) {
+            if (($hook['config']['url'] ?? null) === $url) {
+                return (int) $hook['id'];
+            }
+        }
+
+        return null;
+    }
+
+    public function deleteWebhook(string $fullName, int $id): void
+    {
+        $this->delete("/repos/{$fullName}/hooks/{$id}");
+    }
+
     /**
      * @param  array<string, mixed>  $query
      * @return array<mixed>
@@ -127,6 +183,20 @@ class GitHubClient
     private function get(string $path, array $query = []): array
     {
         return $this->send(fn (): Response => $this->request()->get(self::API.$path, $query));
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<mixed>
+     */
+    private function post(string $path, array $payload): array
+    {
+        return $this->send(fn (): Response => $this->request()->post(self::API.$path, $payload));
+    }
+
+    private function delete(string $path): void
+    {
+        $this->send(fn (): Response => $this->request()->delete(self::API.$path));
     }
 
     /**
