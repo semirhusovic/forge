@@ -17,6 +17,7 @@
 - `tests/Pest.php` does **not** apply `RefreshDatabase` globally — every new test file needs `uses(RefreshDatabase::class);`.
 - Tests create sites with `Site::create([...])` (see `tests/Feature/WebhookDeployTest.php`); there is no `SiteFactory` and this plan does not add one.
 - `config(['forge.fake_shell' => true])` is required in any test that creates a site, so `GenerateSiteDeployKey` does not shell out.
+- **Wayfinder output is gitignored.** `.gitignore` lists `/resources/js/actions`, `/resources/js/routes` and `/resources/js/wayfinder`, and no generated file has ever been tracked. Run `php artisan wayfinder:generate` after adding routes so the TypeScript helpers exist locally for the build, but do **not** `git add` them. (Corrected during execution — earlier task steps below said to commit them; ignore that.)
 
 ---
 
@@ -1444,7 +1445,7 @@ Expected: PASS (7 tests)
 ```bash
 vendor/bin/pint --dirty --format agent
 php artisan wayfinder:generate
-git add app/Http/Controllers/GitHubRepositoryController.php routes/web.php resources/js/actions resources/js/routes tests/Feature/GitHubRepositoryPickerTest.php
+git add app/Http/Controllers/GitHubRepositoryController.php routes/web.php tests/Feature/GitHubRepositoryPickerTest.php
 git commit -m "feat: expose repository search and branch list endpoints"
 ```
 
