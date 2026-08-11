@@ -5,6 +5,7 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\DeployScriptController;
 use App\Http\Controllers\EnvFileController;
+use App\Http\Controllers\GitHubRepositoryController;
 use App\Http\Controllers\LogFileController;
 use App\Http\Controllers\SchedulerController;
 use App\Http\Controllers\SiteController;
@@ -23,6 +24,8 @@ Route::post('webhook/deploy/{site}/{token}', WebhookDeployController::class)
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('github/repositories', [GitHubRepositoryController::class, 'index'])->name('github.repositories');
+    Route::get('github/branches', [GitHubRepositoryController::class, 'branches'])->name('github.branches');
     Route::resource('sites', SiteController::class)->only(['index', 'store', 'show', 'destroy']);
     Route::post('sites/{site}/install', SiteInstallController::class)->name('sites.install');
     Route::post('sites/{site}/deployments', [DeploymentController::class, 'store'])->name('sites.deployments.store');
