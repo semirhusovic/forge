@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\GenerateSiteDeployKey;
 use App\Actions\ProvisionGitHubRepository;
+use App\Actions\TeardownGitHubRepository;
 use App\Http\Requests\StoreSiteRequest;
 use App\Jobs\InstallRepository;
 use App\Models\Site;
@@ -100,11 +101,19 @@ class SiteController extends Controller
     }
 
     public function destroy(
+        Request $request,
         Site $site,
         ApacheManager $apache,
         WorkerManager $workers,
         SchedulerManager $scheduler,
+        TeardownGitHubRepository $github,
     ): RedirectResponse {
+        try {
+            $github->handle($site, $request->user());
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         foreach ($site->workers as $worker) {
             $workers->remove($worker);
         }
