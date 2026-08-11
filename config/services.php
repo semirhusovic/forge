@@ -35,4 +35,22 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | GitHub OAuth App
+    |--------------------------------------------------------------------------
+    |
+    | Credentials of the OAuth App used to connect a GitHub account to the
+    | panel. Register one at github.com/settings/developers with the callback
+    | URL <panel-url>/settings/github/callback. The redirect URI itself is
+    | derived from the github.callback route, so it always matches the host
+    | the panel is served from.
+    |
+    */
+
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+    ],
+
 ];
