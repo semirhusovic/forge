@@ -149,11 +149,9 @@ function repoShort(repository: string) {
                                 class="w-full rounded-lg bg-transparent px-2.5 py-2 font-mono text-sm outline-none"
                             />
                         </div>
-                        <span
-                            v-if="form.errors.domain"
-                            class="mt-1 block text-xs text-red-600"
-                            >{{ form.errors.domain }}</span
-                        >
+                        <span v-if="form.errors.domain" class="field-error">{{
+                            form.errors.domain
+                        }}</span>
                     </label>
                     <label class="text-sm font-medium">
                         Branch
@@ -169,11 +167,9 @@ function repoShort(repository: string) {
                                 class="w-full rounded-lg bg-transparent px-2.5 py-2 font-mono text-sm outline-none"
                             />
                         </div>
-                        <span
-                            v-if="form.errors.branch"
-                            class="mt-1 block text-xs text-red-600"
-                            >{{ form.errors.branch }}</span
-                        >
+                        <span v-if="form.errors.branch" class="field-error">{{
+                            form.errors.branch
+                        }}</span>
                     </label>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
@@ -186,7 +182,7 @@ function repoShort(repository: string) {
                         />
                         <span
                             v-if="form.errors.repository"
-                            class="mt-1 block text-xs text-red-600"
+                            class="field-error"
                             >{{ form.errors.repository }}</span
                         >
                     </label>
@@ -206,7 +202,7 @@ function repoShort(repository: string) {
                         </select>
                         <span
                             v-if="form.errors.php_version"
-                            class="mt-1 block text-xs text-red-600"
+                            class="field-error"
                             >{{ form.errors.php_version }}</span
                         >
                     </label>

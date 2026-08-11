@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
+import { RefreshCw, ScrollText, Trash2 } from '@lucide/vue';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { destroy as logsDestroy } from '@/routes/sites/logs';
 import type { LogContent, LogFileItem, SiteProps } from '../Show.vue';
@@ -60,6 +61,7 @@ function startTimer() {
         if (document.hidden) {
             return;
         }
+
         load(selected.value);
     }, 5000);
 }
@@ -98,67 +100,88 @@ function formatSize(bytes: number): string {
 </script>
 
 <template>
-    <div class="flex flex-col gap-3 rounded-xl border p-4">
-        <div class="flex flex-wrap items-center gap-3">
-            <h2 class="font-semibold">Logs</h2>
+    <section class="panel">
+        <div class="panel-header">
+            <ScrollText class="size-4 text-primary" />
+            <h2 class="panel-title">Logs</h2>
             <span class="text-xs text-muted-foreground">
                 <code>{{ site.root_path }}/storage/logs</code>
             </span>
         </div>
 
-        <!-- Loading -->
-        <div v-if="logFiles === undefined" class="h-64 animate-pulse rounded bg-muted"></div>
+        <div class="panel-body">
+            <div
+                v-if="logFiles === undefined"
+                class="h-64 animate-pulse rounded-xl bg-muted"
+            ></div>
 
-        <p v-else-if="logFiles.length === 0" class="text-sm text-muted-foreground">
-            No log files yet. Laravel creates <code>laravel.log</code> the first
-            time the site writes a log entry.
-        </p>
-
-        <template v-else>
-            <div class="flex flex-wrap items-center gap-2">
-                <select
-                    :value="selected ?? ''"
-                    @change="selectFile"
-                    class="rounded border bg-background px-2 py-1.5 font-mono text-xs"
-                >
-                    <option v-for="file in logFiles" :key="file.name" :value="file.name">
-                        {{ file.name }} ({{ formatSize(file.size) }})
-                    </option>
-                </select>
-
-                <button
-                    @click="load(selected)"
-                    class="rounded border px-3 py-1.5 text-sm hover:bg-muted"
-                >
-                    Refresh
-                </button>
-
-                <label class="flex items-center gap-1.5 text-sm">
-                    <input v-model="autoRefresh" type="checkbox" class="rounded" />
-                    Auto-refresh
-                </label>
-
-                <button
-                    @click="clearLog"
-                    class="ml-auto rounded border border-red-500/40 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/10 dark:text-red-400"
-                >
-                    Clear file
-                </button>
-            </div>
-
-            <p v-if="logContent?.truncated" class="text-xs text-muted-foreground">
-                Showing the last 500 lines of
-                {{ formatSize(logContent.size) }} — earlier entries are not
-                displayed. Read the full file on the server.
+            <p
+                v-else-if="logFiles.length === 0"
+                class="text-sm text-muted-foreground"
+            >
+                No log files yet. Laravel creates <code>laravel.log</code> the
+                first time the site writes a log entry.
             </p>
 
-            <pre
-                v-if="logContent?.content"
-                class="max-h-[32rem] overflow-auto rounded bg-[#0c0a09] p-4 font-mono text-xs leading-relaxed whitespace-pre text-emerald-400"
-                >{{ logContent.content }}</pre>
-            <p v-else class="text-sm text-muted-foreground">
-                This log file is empty.
-            </p>
-        </template>
-    </div>
+            <template v-else>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select
+                        :value="selected ?? ''"
+                        @change="selectFile"
+                        class="rounded-lg border border-input bg-background px-2.5 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
+                    >
+                        <option
+                            v-for="file in logFiles"
+                            :key="file.name"
+                            :value="file.name"
+                        >
+                            {{ file.name }} ({{ formatSize(file.size) }})
+                        </option>
+                    </select>
+
+                    <button
+                        @click="load(selected)"
+                        class="btn-secondary px-3 py-2"
+                    >
+                        <RefreshCw class="size-3.5" /> Refresh
+                    </button>
+
+                    <label
+                        class="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                        <input
+                            v-model="autoRefresh"
+                            type="checkbox"
+                            class="accent-primary"
+                        />
+                        Auto-refresh
+                    </label>
+
+                    <button
+                        @click="clearLog"
+                        class="btn-danger ml-auto px-3 py-2"
+                    >
+                        <Trash2 class="size-3.5" /> Clear file
+                    </button>
+                </div>
+
+                <p
+                    v-if="logContent?.truncated"
+                    class="text-xs text-muted-foreground"
+                >
+                    Showing the last 500 lines of
+                    {{ formatSize(logContent.size) }} — earlier entries are not
+                    displayed.
+                </p>
+
+                <pre
+                    v-if="logContent?.content"
+                    class="terminal max-h-[32rem] rounded-xl border border-border"
+                    >{{ logContent.content }}</pre>
+                <p v-else class="text-sm text-muted-foreground">
+                    This log file is empty.
+                </p>
+            </template>
+        </div>
+    </section>
 </template>

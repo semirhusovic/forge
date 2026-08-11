@@ -121,11 +121,9 @@ function remove(database: DatabaseItem) {
                         class="w-full rounded-lg bg-transparent px-2.5 py-2 font-mono text-sm outline-none"
                     />
                 </div>
-                <span
-                    v-if="form.errors.name"
-                    class="mt-1 block text-xs text-red-600"
-                    >{{ form.errors.name }}</span
-                >
+                <span v-if="form.errors.name" class="field-error">{{
+                    form.errors.name
+                }}</span>
             </label>
             <label class="text-sm font-medium">
                 Username
@@ -139,11 +137,9 @@ function remove(database: DatabaseItem) {
                         class="w-full rounded-lg bg-transparent px-2.5 py-2 font-mono text-sm outline-none"
                     />
                 </div>
-                <span
-                    v-if="form.errors.username"
-                    class="mt-1 block text-xs text-red-600"
-                    >{{ form.errors.username }}</span
-                >
+                <span v-if="form.errors.username" class="field-error">{{
+                    form.errors.username
+                }}</span>
             </label>
             <button type="submit" :disabled="form.processing" class="btn-ember">
                 <Plus class="size-4" /> Create

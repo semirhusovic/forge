@@ -155,7 +155,9 @@ usePoll(3000, { only: ['site', 'deployments', 'workers'] });
                             ><Lock class="size-3.5" />
                             {{ site.ssl_enabled ? 'HTTPS' : 'HTTP only' }}</span
                         >
-                        <span class="font-mono">PHP {{ site.php_version }}</span>
+                        <span class="font-mono"
+                            >PHP {{ site.php_version }}</span
+                        >
                         <span class="truncate font-mono">{{
                             site.root_path
                         }}</span>

@@ -9,10 +9,10 @@ import {
     History,
 } from '@lucide/vue';
 import { watch } from 'vue';
-import { install as siteInstall } from '@/routes/sites';
-import { store as deploymentsStore } from '@/routes/sites/deployments';
-import { update as deployScriptUpdate } from '@/routes/sites/deploy-script';
 import DeploymentRow from '@/pages/sites/DeploymentRow.vue';
+import { install as siteInstall } from '@/routes/sites';
+import { update as deployScriptUpdate } from '@/routes/sites/deploy-script';
+import { store as deploymentsStore } from '@/routes/sites/deployments';
 import type { SiteProps, DeploymentItem } from '../Show.vue';
 
 const props = defineProps<{ site: SiteProps; deployments: DeploymentItem[] }>();
@@ -125,9 +125,7 @@ function deployNow() {
                     running
                 </span>
             </div>
-            <pre
-                class="max-h-96 overflow-auto bg-[#0c0a09] p-4 font-mono text-xs leading-relaxed text-emerald-400"
-                >{{ site.provision_log }}</pre>
+            <pre class="terminal max-h-96">{{ site.provision_log }}</pre>
         </section>
 
         <template v-if="site.status === 'installed'">
@@ -177,11 +175,11 @@ function deployNow() {
                     v-model="scriptForm.deploy_script"
                     rows="8"
                     spellcheck="false"
-                    class="w-full rounded-xl border border-border bg-[#0c0a09] p-4 font-mono text-xs leading-relaxed text-emerald-300 outline-none focus:ring-2 focus:ring-ring"
+                    class="code-editor"
                 ></textarea>
                 <span
                     v-if="scriptForm.errors.deploy_script"
-                    class="text-sm text-red-600"
+                    class="field-error text-sm"
                     >{{ scriptForm.errors.deploy_script }}</span
                 >
                 <button

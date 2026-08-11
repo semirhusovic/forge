@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useForm, router } from '@inertiajs/vue3';
+import { KeyRound, Save } from '@lucide/vue';
 import { onMounted, watch } from 'vue';
 import { update as envUpdate } from '@/routes/sites/env';
 import type { SiteProps } from '../Show.vue';
@@ -29,28 +30,48 @@ function save() {
 </script>
 
 <template>
-    <div class="flex flex-col gap-2 rounded-xl border p-4">
-        <h2 class="font-semibold">.env</h2>
-        <div
-            v-if="envContent === undefined"
-            class="h-64 animate-pulse rounded bg-muted"
-        ></div>
-        <template v-else>
-            <textarea
-                v-model="form.content"
-                rows="20"
-                class="w-full rounded border p-2 font-mono text-xs"
-            ></textarea>
-            <span v-if="form.errors.content" class="text-sm text-red-600">{{
-                form.errors.content
-            }}</span>
-            <button
-                @click="save"
-                :disabled="form.processing"
-                class="self-start rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50 dark:bg-white dark:text-black"
+    <section class="panel">
+        <div class="panel-header">
+            <KeyRound class="size-4 text-primary" />
+            <h2 class="panel-title">Environment</h2>
+            <span class="text-xs text-muted-foreground">
+                <code>{{ site.root_path }}/.env</code>
+            </span>
+            <span
+                v-if="form.isDirty"
+                class="ml-auto text-xs font-medium text-primary"
             >
-                Save .env
-            </button>
-        </template>
-    </div>
+                Unsaved changes
+            </span>
+        </div>
+
+        <div class="panel-body">
+            <div
+                v-if="envContent === undefined"
+                class="h-72 animate-pulse rounded-xl bg-muted"
+            ></div>
+
+            <template v-else>
+                <textarea
+                    v-model="form.content"
+                    rows="20"
+                    spellcheck="false"
+                    class="code-editor"
+                ></textarea>
+
+                <span v-if="form.errors.content" class="field-error">{{
+                    form.errors.content
+                }}</span>
+
+                <button
+                    @click="save"
+                    :disabled="form.processing"
+                    class="btn-ember self-start"
+                >
+                    <Save class="size-4" />
+                    {{ form.processing ? 'Saving…' : 'Save .env' }}
+                </button>
+            </template>
+        </div>
+    </section>
 </template>

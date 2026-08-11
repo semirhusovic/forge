@@ -128,6 +128,12 @@
     --chart-4: hsl(199 65% 45%);
     --chart-5: hsl(350 70% 55%);
     --radius: 0.7rem;
+    /* Consoles and code editors stay dark in both themes, the way an embedded
+       terminal is conventionally rendered. Defined once so log output, the
+       deploy-script editor and the SQL console cannot drift apart. */
+    --terminal-background: hsl(24 16% 4%);
+    --terminal-foreground: hsl(152 55% 72%);
+    --terminal-border: hsl(28 10% 15%);
     --sidebar-background: hsl(34 30% 97%);
     --sidebar-foreground: hsl(24 12% 32%);
     --sidebar-primary: hsl(20 90% 50%);
@@ -195,6 +201,15 @@
     }
 }
 
+/* Lift shared by every primary action, including the shadcn <Button> default
+   variant, so auth and settings pages match the panel chrome. Declared with
+   @utility (not @layer) so it can be both used as a class and @apply-ed. */
+@utility ember-raise {
+    box-shadow:
+        0 1px 0 0 color-mix(in oklch, white 22%, transparent) inset,
+        0 8px 22px -10px color-mix(in oklch, var(--brand) 80%, transparent);
+}
+
 @layer components {
     /* Molten ember glow used behind headers and the brand mark. */
     .forge-glow {
@@ -223,15 +238,74 @@
 
     /* Ember primary action button. */
     .btn-ember {
-        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition;
-        box-shadow:
-            0 1px 0 0 color-mix(in oklch, white 22%, transparent) inset,
-            0 8px 22px -10px color-mix(in oklch, var(--brand) 80%, transparent);
+        @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground ember-raise transition;
     }
     .btn-ember:hover {
         filter: brightness(1.06);
     }
     .btn-ember:disabled {
         @apply pointer-events-none opacity-50;
+    }
+
+    /* Neutral action. Replaces the hand-rolled `bg-black dark:bg-white`
+       inversions, which fought the ember identity and had to be re-specified
+       in every panel. */
+    .btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-background px-3.5 py-2 text-sm font-medium transition;
+    }
+    .btn-secondary:hover {
+        @apply bg-muted;
+    }
+    .btn-secondary:disabled {
+        @apply pointer-events-none opacity-50;
+    }
+
+    /* Destructive action, tinted rather than filled so it reads as a warning
+       without shouting on every panel it appears in. */
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-2 text-sm font-medium text-destructive transition;
+    }
+    .btn-danger:hover {
+        @apply bg-destructive/20;
+    }
+    .btn-danger:disabled {
+        @apply pointer-events-none opacity-50;
+    }
+
+    /* Card surface shared by every panel, matching what the index pages
+       already use so tabs stop looking like a different application. */
+    .panel {
+        @apply overflow-hidden rounded-2xl border border-border bg-card;
+    }
+    .panel-header {
+        @apply flex flex-wrap items-center gap-2 border-b border-border px-5 py-3.5;
+    }
+    .panel-title {
+        @apply font-display text-sm font-bold;
+    }
+    .panel-body {
+        @apply flex flex-col gap-4 p-5;
+    }
+
+    /* Read-only console output. */
+    .terminal {
+        @apply overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre;
+        background: var(--terminal-background);
+        color: var(--terminal-foreground);
+    }
+
+    /* Editable code. Same palette as .terminal so an editor and the output it
+       produces are visibly the same surface. */
+    .code-editor {
+        @apply w-full rounded-xl border p-4 font-mono text-xs leading-relaxed outline-none focus:ring-2 focus:ring-ring;
+        background: var(--terminal-background);
+        color: var(--terminal-foreground);
+        border-color: var(--terminal-border);
+    }
+
+    /* Inline validation message. Uses the destructive token so it stays
+       legible in both themes — the old text-red-600 had no dark variant. */
+    .field-error {
+        @apply mt-1 block text-xs font-medium text-destructive;
     }
 }

@@ -7,6 +7,7 @@ type Tone = 'ok' | 'busy' | 'bad' | 'idle';
 
 const tone = computed<Tone>(() => {
     const s = props.status.toLowerCase();
+
     if (
         [
             'installed',
@@ -19,9 +20,11 @@ const tone = computed<Tone>(() => {
     ) {
         return 'ok';
     }
+
     if (['failed', 'error', 'errored'].includes(s)) {
         return 'bad';
     }
+
     if (
         [
             'installing',
@@ -34,6 +37,7 @@ const tone = computed<Tone>(() => {
     ) {
         return 'busy';
     }
+
     return 'idle';
 });
 

@@ -96,9 +96,8 @@ onUnmounted(stopPolling);
                 · {{ new Date(deployment.created_at).toLocaleString() }}
             </span>
         </button>
-        <pre
-            v-if="expanded"
-            class="max-h-96 overflow-auto border-t border-border bg-[#0c0a09] p-4 font-mono text-xs leading-relaxed text-emerald-400"
-            >{{ log || 'no output yet…' }}</pre>
+        <pre v-if="expanded" class="terminal max-h-96 border-t border-border">{{
+            log || 'no output yet…'
+        }}</pre>
     </div>
 </template>

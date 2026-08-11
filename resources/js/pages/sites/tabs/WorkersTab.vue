@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useForm, router } from '@inertiajs/vue3';
+import { Cpu, Plus, RotateCw, Trash2 } from '@lucide/vue';
+import StatusBadge from '@/components/StatusBadge.vue';
 import {
     store as workersStore,
     restart as workerRestart,
@@ -34,74 +36,101 @@ function remove(worker: WorkerItem) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4">
-        <form
-            @submit.prevent="create"
-            class="flex items-end gap-2 rounded-xl border p-4"
-        >
-            <label class="text-sm">
-                Type
-                <select
-                    class="mt-1 w-full rounded border px-2 py-1.5 text-xs"
-                    @change="
-                        form.command = ($event.target as HTMLSelectElement)
-                            .value
-                    "
-                >
-                    <option
-                        v-for="preset in presets"
-                        :key="preset.command"
-                        :value="preset.command"
-                    >
-                        {{ preset.label }}
-                    </option>
-                </select>
-            </label>
-            <label class="flex-1 text-sm">
-                Artisan command
-                <input
-                    v-model="form.command"
-                    class="mt-1 w-full rounded border px-2 py-1.5 font-mono text-xs"
-                />
-                <span v-if="form.errors.command" class="text-sm text-red-600">{{
-                    form.errors.command
-                }}</span>
-            </label>
-            <button
-                type="submit"
-                :disabled="form.processing"
-                class="rounded bg-black px-4 py-2 text-sm text-white dark:bg-white dark:text-black"
-            >
-                Add worker
-            </button>
-        </form>
+    <div class="flex flex-col gap-6">
+        <section class="panel">
+            <div class="panel-header">
+                <Cpu class="size-4 text-primary" />
+                <h2 class="panel-title">Add worker</h2>
+            </div>
 
-        <div class="flex flex-col gap-2">
+            <form
+                @submit.prevent="create"
+                class="grid gap-4 p-5 sm:grid-cols-[14rem_1fr_auto] sm:items-end"
+            >
+                <label class="text-sm font-medium">
+                    Type
+                    <select
+                        class="mt-1.5 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                        @change="
+                            form.command = (
+                                $event.target as HTMLSelectElement
+                            ).value
+                        "
+                    >
+                        <option
+                            v-for="preset in presets"
+                            :key="preset.command"
+                            :value="preset.command"
+                        >
+                            {{ preset.label }}
+                        </option>
+                    </select>
+                </label>
+
+                <label class="text-sm font-medium">
+                    Artisan command
+                    <input
+                        v-model="form.command"
+                        spellcheck="false"
+                        class="mt-1.5 w-full rounded-lg border border-input bg-background px-2.5 py-2 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <span v-if="form.errors.command" class="field-error">{{
+                        form.errors.command
+                    }}</span>
+                </label>
+
+                <button
+                    type="submit"
+                    :disabled="form.processing"
+                    class="btn-ember"
+                >
+                    <Plus class="size-4" /> Add worker
+                </button>
+            </form>
+        </section>
+
+        <section v-if="workers.length" class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Running workers</h2>
+                <span class="text-xs text-muted-foreground"
+                    >{{ workers.length }} total</span
+                >
+            </div>
+
             <div
                 v-for="worker in workers"
                 :key="worker.id"
-                class="flex items-center gap-3 rounded border p-3 text-sm"
+                class="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3.5 text-sm last:border-0"
             >
-                <code class="flex-1">php artisan {{ worker.command }}</code>
-                <span class="text-xs text-muted-foreground">{{
-                    worker.status
-                }}</span>
+                <code class="min-w-0 flex-1 truncate font-mono text-xs"
+                    >php artisan {{ worker.command }}</code
+                >
+                <StatusBadge :status="worker.status" />
                 <button
                     @click="restart(worker)"
-                    class="rounded border px-3 py-1"
+                    class="btn-secondary px-3 py-1.5"
                 >
-                    Restart
+                    <RotateCw class="size-3.5" /> Restart
                 </button>
-                <button
-                    @click="remove(worker)"
-                    class="rounded border border-red-300 px-3 py-1 text-red-700"
-                >
-                    Delete
+                <button @click="remove(worker)" class="btn-danger px-3 py-1.5">
+                    <Trash2 class="size-3.5" /> Delete
                 </button>
             </div>
-            <div v-if="!workers.length" class="text-sm text-muted-foreground">
-                No workers.
+        </section>
+
+        <div
+            v-else
+            class="forge-grid flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/40 px-6 py-12 text-center"
+        >
+            <div
+                class="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+            >
+                <Cpu class="size-6" />
             </div>
+            <p class="text-sm text-muted-foreground">
+                No workers yet. Add one above to run a queue or SSR process
+                under systemd.
+            </p>
         </div>
     </div>
 </template>
