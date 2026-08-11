@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class GitHubConnectionController extends Controller
 {
@@ -36,8 +37,15 @@ class GitHubConnectionController extends Controller
 
     /**
      * Redirect the user to GitHub to authorize the requested scopes.
+     *
+     * Inertia::location rather than redirect()->away(): the connect button
+     * submits over XHR, and a plain 302 to github.com makes the browser
+     * follow it as a cross-origin fetch, which GitHub rejects with a CORS
+     * error. Inertia answers 409 + X-Inertia-Location instead, which the
+     * client turns into a real page navigation. Non-Inertia callers still get
+     * an ordinary 302.
      */
-    public function create(Request $request): RedirectResponse
+    public function create(Request $request): SymfonyResponse
     {
         if (blank(config('services.github.client_id')) || blank(config('services.github.client_secret'))) {
             return to_route('github.edit')->with('error', 'Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in the panel .env first.');
@@ -46,7 +54,7 @@ class GitHubConnectionController extends Controller
         $state = Str::random(40);
         $request->session()->put('github_oauth_state', $state);
 
-        return redirect()->away(self::AUTHORIZE_URL.'?'.http_build_query([
+        return Inertia::location(self::AUTHORIZE_URL.'?'.http_build_query([
             'client_id' => config('services.github.client_id'),
             'redirect_uri' => route('github.callback'),
             'scope' => self::SCOPES,

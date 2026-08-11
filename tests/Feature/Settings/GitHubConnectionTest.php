@@ -144,3 +144,20 @@ test('disconnecting clears the connection', function () {
 
     expect($this->user->fresh()->hasGitHubConnection())->toBeFalse();
 });
+
+test('an inertia xhr connect returns a client-side location instead of a cross-origin redirect', function () {
+    // A 302 to github.com is followed by the XHR as a cross-origin fetch and
+    // blocked by CORS. Inertia's 409 + X-Inertia-Location makes the client
+    // navigate the whole page instead.
+    $response = $this->actingAs($this->user)
+        ->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => ''])
+        ->post(route('github.connect'));
+
+    $response->assertStatus(409);
+
+    expect($response->headers->get('X-Inertia-Location'))
+        ->toStartWith('https://github.com/login/oauth/authorize')
+        ->toContain('client_id=client-id');
+
+    expect(session('github_oauth_state'))->toBeString();
+});
