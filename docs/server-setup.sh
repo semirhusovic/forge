@@ -1,17 +1,30 @@
 #!/usr/bin/env bash
-# One-time setup for the Forge panel host. Run as root on Ubuntu 22.04/24.04:
-#   sudo bash server-setup.sh
+# One-time setup for the Forge panel host. Run as root on Ubuntu 22.04/24.04.
 #
-# Override where the panel itself is deployed (used for the queue worker):
-#   sudo PANEL_DIR=/home/forge/panel bash server-setup.sh
+# Clone the panel first (it is a private repo, so the clone stays manual), then
+# run this script to provision the host AND finish deploying the panel:
 #
-# Safe to re-run: re-running after the panel is deployed will pick it up and
-# start the queue worker.
+#   sudo -u forge git clone git@github.com:semirhusovic/forge.git /home/forge/panel
+#   sudo PANEL_DOMAIN=panel.example.com PANEL_EMAIL=you@example.com bash server-setup.sh
+#
+# Environment overrides:
+#   PANEL_DIR     where the panel lives           (default /home/forge/panel)
+#   PANEL_DOMAIN  vhost ServerName for the panel  (unset = skip vhost + SSL)
+#   PANEL_EMAIL   Let's Encrypt registration mail (unset = skip SSL only)
+#   SKIP_BUILD=1  skip `npm ci && npm run build`  (fast config-only re-runs)
+#
+# Safe to re-run. Every mutating step is either guarded or rewrites identical
+# content; in particular APP_KEY is generated only once, the panel .env is
+# seeded only when absent, the panel vhost is never rewritten over certbot's
+# edits, and certbot is not re-invoked once a certificate exists.
 set -euo pipefail
 
 FORGE_USER=forge
 FORGE_HOME=/home/forge
 PANEL_DIR="${PANEL_DIR:-/home/forge/panel}"
+PANEL_DOMAIN="${PANEL_DOMAIN:-}"
+PANEL_EMAIL="${PANEL_EMAIL:-}"
+SKIP_BUILD="${SKIP_BUILD:-}"
 
 # --- system packages -------------------------------------------------------
 # --allow-releaseinfo-change: third-party repos already on the box (e.g. the
@@ -19,8 +32,13 @@ PANEL_DIR="${PANEL_DIR:-/home/forge/panel}"
 # a plain `apt-get update` fail non-interactively and abort the whole script.
 # Package signatures are still verified as usual.
 apt-get update --allow-releaseinfo-change
+# unzip is what composer shells out to when extracting dist packages; without it
+# composer silently falls back to slow git clones (or fails on some archives).
+# Composer is deliberately NOT installed from apt here — see the composer
+# section below for why.
 apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
-    php-mbstring php-zip php-sqlite3 composer git certbot python3-certbot-apache \
+    php-mbstring php-zip php-sqlite3 php-gd php-bcmath php-intl php-gmp \
+    php-opcache php-readline git unzip certbot python3-certbot-apache \
     mysql-server curl ca-certificates gnupg software-properties-common
 
 # --- per-site php versions ---------------------------------------------------
@@ -29,7 +47,7 @@ apt-get install -y apache2 php-fpm php-cli php-mysql php-xml php-curl \
 # and a forge FPM pool with a versioned socket for the site's vhost. Ubuntu's
 # archive carries only one PHP, so the extra versions come from the ondrej PPA
 # (idempotent to re-add).
-SITE_PHP_VERSIONS="8.3 8.4"
+SITE_PHP_VERSIONS="8.3 8.4 8.5"
 
 # The panel itself keeps running on the current default /usr/bin/php and the
 # unversioned php-fpm-forge.sock pool. Capture that version BEFORE installing
@@ -42,10 +60,30 @@ add-apt-repository -y ppa:ondrej/php
 
 # intl is required by the apt composer binary itself (Symfony's string helpers
 # need the Normalizer class once install progress rendering kicks in) and by
-# many Laravel apps.
+# many Laravel apps. gd/bcmath/gmp round out the set most Laravel packages
+# assume is present (image manipulation, money math, crypto helpers) — a site
+# that needs one and finds it missing only fails at runtime, long after deploy.
 for v in $SITE_PHP_VERSIONS; do
-    apt-get install -y "php$v-fpm" "php$v-cli" "php$v-mysql" "php$v-xml" \
-        "php$v-curl" "php$v-mbstring" "php$v-zip" "php$v-sqlite3" "php$v-intl"
+    # fpm and cli are load-bearing: a version without them cannot serve or
+    # deploy a site at all, so let a failure here abort the script.
+    apt-get install -y "php$v-fpm" "php$v-cli"
+
+    # The extensions are additive. Try them in one transaction, but fall back to
+    # installing them individually if that fails: a newly released PHP whose PPA
+    # is missing one package would otherwise abort provisioning entirely and
+    # leave the host half-configured. Whatever is genuinely unavailable is
+    # reported and skipped.
+    ext_packages=""
+    for ext in mysql xml curl mbstring zip sqlite3 intl gd bcmath gmp opcache readline; do
+        ext_packages="$ext_packages php$v-$ext"
+    done
+
+    # shellcheck disable=SC2086 # deliberate word splitting into package args
+    if ! apt-get install -y $ext_packages; then
+        for pkg in $ext_packages; do
+            apt-get install -y "$pkg" || echo "WARNING: $pkg is unavailable — skipped."
+        done
+    fi
 done
 
 update-alternatives --set php "/usr/bin/php$PHP_VERSION"
@@ -58,6 +96,41 @@ for v in $SITE_PHP_VERSIONS; do
     mkdir -p "/opt/forge/php/$v"
     ln -sf "/usr/bin/php$v" "/opt/forge/php/$v/php"
 done
+
+# --- composer --------------------------------------------------------------
+# Ubuntu's `composer` package lags a long way behind upstream, and the versions
+# in 22.04/24.04 predate PHP 8.4 support — they emit a wall of deprecation
+# notices from Composer's own vendored code before doing any useful work. Take
+# it from the official installer instead, into /usr/local/bin, which also makes
+# `composer self-update` work (the apt binary is root-owned and not updatable).
+#
+# The panel and every site deploy invoke this absolute path via
+# config('forge.composer_binary'), so /usr/bin/composer being left behind on an
+# already-provisioned box is harmless.
+COMPOSER_BIN=/usr/local/bin/composer
+
+if [ ! -x "$COMPOSER_BIN" ]; then
+    composer_setup="$(mktemp /tmp/composer-setup-XXXXXX.php)"
+    curl -fsSL https://getcomposer.org/installer -o "$composer_setup"
+    expected_sig="$(curl -fsSL https://composer.github.io/installer.sig)"
+    actual_sig="$(php -r "echo hash_file('sha384', '$composer_setup');")"
+
+    # Refuse rather than continue: this installer runs as root.
+    if [ "$expected_sig" != "$actual_sig" ]; then
+        rm -f "$composer_setup"
+        echo "ERROR: composer installer signature mismatch — refusing to install." >&2
+        exit 1
+    fi
+
+    php "$composer_setup" --install-dir=/usr/local/bin --filename=composer --quiet
+    rm -f "$composer_setup"
+fi
+
+# Keep an already-installed composer current on re-runs. COMPOSER_ALLOW_SUPERUSER
+# belongs here and only here: this one call really does run as root. Non-fatal,
+# so a network blip or a yanked release cannot abort provisioning.
+COMPOSER_ALLOW_SUPERUSER=1 "$COMPOSER_BIN" self-update --no-interaction \
+    || echo "WARNING: composer self-update failed; continuing with the installed version."
 
 # --- node.js ---------------------------------------------------------------
 # Site deploy scripts (and the panel's own frontend) build assets with
@@ -94,6 +167,15 @@ mkdir -p "$FORGE_HOME/.ssh"
 touch "$FORGE_HOME/.ssh/config"
 chown -R "$FORGE_USER:$FORGE_USER" "$FORGE_HOME/.ssh"
 chmod 700 "$FORGE_HOME/.ssh"
+
+# useradd only owns the home directory when it is the one that creates it. If
+# /home/forge already existed (pre-created by hand, or left behind by another
+# tool), it stays root-owned and forge cannot write into it — which surfaces
+# much later as an install failure that looks like a git problem:
+#   fatal: could not create work tree dir '/home/forge/example.com': Permission denied
+# Non-recursive on purpose: site trees below it are already forge-owned, and a
+# recursive chown would needlessly walk every deployed site on each re-run.
+chown "$FORGE_USER:$FORGE_USER" "$FORGE_HOME"
 
 # Apache (www-data) must traverse /home/forge to reach site DocumentRoots.
 chmod 755 "$FORGE_HOME"
@@ -242,6 +324,184 @@ GRANT ALL PRIVILEGES ON *.* TO 'forge_admin'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 SQL
 
+# --- panel bootstrap -------------------------------------------------------
+# Everything from here down configures the panel itself. The clone stays manual
+# (private repo), so bail out with instructions when it hasn't happened yet —
+# the host is fully provisioned at this point either way.
+if [ ! -f "$PANEL_DIR/artisan" ]; then
+    echo
+    echo "Host provisioning is complete, but no panel was found at $PANEL_DIR."
+    echo "Clone it and re-run this script to finish the deploy:"
+    echo
+    echo "  sudo -u $FORGE_USER git clone git@github.com:semirhusovic/forge.git $PANEL_DIR"
+    echo "  sudo PANEL_DOMAIN=panel.example.com PANEL_EMAIL=you@example.com bash server-setup.sh"
+    echo
+    echo "MySQL admin user 'forge_admin'@'localhost' is provisioned; its password"
+    echo "lives in $MYSQL_PASSWORD_FILE and is written into the"
+    echo "panel's .env as FORGE_MYSQL_PASSWORD on that second run."
+    exit 0
+fi
+
+# Run a command in the panel directory as the forge user. -H sets HOME so
+# composer and npm find their caches instead of writing into root's.
+run_as_forge() {
+    sudo -u "$FORGE_USER" -H bash -c "cd '$PANEL_DIR' && $*"
+}
+
+# Idempotent .env writer: replace the key in place when present, append when
+# not. '|' delimits the sed expression so paths and URLs need no escaping.
+# Values containing '|' or '&' would still need care; none of the callers below
+# pass any (hex password, domain, email, fixed literals).
+set_env() {
+    local key="$1" value="$2" file="$PANEL_DIR/.env"
+
+    if grep -q "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+# The clone may well have been run as root. php-fpm and the queue worker both
+# run as forge and must be able to write storage/, bootstrap/cache and the
+# SQLite database.
+chown -R "$FORGE_USER:$FORGE_USER" "$PANEL_DIR"
+
+# Seeded ONLY when absent: a re-run must never clobber a configured panel. The
+# values the panel cannot function without are re-asserted below on every run.
+if [ ! -f "$PANEL_DIR/.env" ]; then
+    cp "$PANEL_DIR/.env.example" "$PANEL_DIR/.env"
+    chown "$FORGE_USER:$FORGE_USER" "$PANEL_DIR/.env"
+fi
+
+set_env APP_ENV production
+set_env APP_DEBUG false
+set_env DB_CONNECTION sqlite
+set_env SESSION_DRIVER database
+# Route jobs through the database queue so they run in the worker installed
+# below rather than synchronously inside the web request.
+set_env QUEUE_CONNECTION database
+# Fake shell is a local-development switch; on the server the panel really does
+# shell out.
+set_env FORGE_FAKE_SHELL false
+# Hand the panel the mysql admin password generated above (hex-only, so it is
+# safe inside a sed replacement).
+set_env FORGE_MYSQL_PASSWORD "$MYSQL_ADMIN_PASSWORD"
+
+if [ -n "$PANEL_DOMAIN" ]; then
+    # https only when a certificate is actually going to be issued below.
+    if [ -n "$PANEL_EMAIL" ]; then
+        set_env APP_URL "https://$PANEL_DOMAIN"
+    else
+        set_env APP_URL "http://$PANEL_DOMAIN"
+    fi
+fi
+
+if [ -n "$PANEL_EMAIL" ]; then
+    set_env FORGE_CERTBOT_EMAIL "$PANEL_EMAIL"
+fi
+
+# The panel's own database is SQLite by design (atomic appends to provision
+# logs). touch is a no-op once it exists, so data survives re-runs.
+sudo -u "$FORGE_USER" touch "$PANEL_DIR/database/database.sqlite"
+
+# Pinned to the panel's own PHP rather than bare `php`: the panel is served by
+# the FPM pool for $PHP_VERSION, and composer must resolve platform
+# requirements against that exact version, not whatever the `php` alternative
+# happens to point at. No COMPOSER_ALLOW_SUPERUSER here — this runs as forge,
+# and if it ever needed that flag it would mean vendor/ was being written as
+# root, which is the bug, not the fix.
+run_as_forge "/usr/bin/php$PHP_VERSION" "$COMPOSER_BIN" install \
+    --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+# This guard is the important one. An unconditional `key:generate --force`
+# would mint a fresh APP_KEY on every run and invalidate every session and
+# signed cookie the panel has issued. No model uses an encrypted cast, so the
+# blast radius would stop at "logged out of your own panel" rather than
+# unreadable data — but it should still happen exactly once.
+if ! grep -qE '^APP_KEY=.+' "$PANEL_DIR/.env"; then
+    run_as_forge php artisan key:generate --force
+fi
+
+run_as_forge php artisan migrate --force
+run_as_forge php artisan storage:link || true
+
+if [ -n "$SKIP_BUILD" ]; then
+    echo "SKIP_BUILD set — keeping the existing public/build assets."
+else
+    # Vite's wayfinder plugin shells out to `php artisan` mid-build, so assets
+    # can only be built after composer install and APP_KEY generation.
+    run_as_forge npm ci
+    run_as_forge npm run build
+fi
+
+chmod -R ug+rwX "$PANEL_DIR/storage" "$PANEL_DIR/bootstrap/cache"
+
+# optimize:clear rather than config:cache on purpose: this is the one machine
+# you would be debugging the panel from, and a cached config silently ignores
+# later .env edits made by hand.
+run_as_forge php artisan optimize:clear
+
+# --- panel vhost + ssl -----------------------------------------------------
+if [ -z "$PANEL_DOMAIN" ]; then
+    echo "NOTE: PANEL_DOMAIN not set — skipping the panel's Apache vhost and certificate."
+else
+    PANEL_VHOST="/etc/apache2/sites-available/$PANEL_DOMAIN.conf"
+
+    # Written only when absent. Once certbot has run with --redirect it owns
+    # edits inside this file (the rewrite up to HTTPS) and maintains a companion
+    # $PANEL_DOMAIN-le-ssl.conf. Rewriting the :80 vhost on a re-run would
+    # silently strip that redirect and drop the panel back to plain HTTP.
+    if [ ! -f "$PANEL_VHOST" ]; then
+        cat > "$PANEL_VHOST" <<VHOST
+<VirtualHost *:80>
+    ServerName $PANEL_DOMAIN
+    DocumentRoot $PANEL_DIR/public
+
+    <Directory $PANEL_DIR/public>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <FilesMatch \.php\$>
+        SetHandler "proxy:unix:/run/php/php-fpm-forge.sock|fcgi://localhost"
+    </FilesMatch>
+
+    ErrorLog \${APACHE_LOG_DIR}/$PANEL_DOMAIN-error.log
+    CustomLog \${APACHE_LOG_DIR}/$PANEL_DOMAIN-access.log combined
+</VirtualHost>
+VHOST
+        chmod 644 "$PANEL_VHOST"
+    fi
+
+    a2ensite "$PANEL_DOMAIN.conf" >/dev/null
+
+    # Mirrors what the panel does for managed sites: a config that fails the
+    # test is disabled again so Apache keeps serving everything else.
+    if apache2ctl configtest >/dev/null 2>&1; then
+        systemctl reload apache2
+    else
+        a2dissite "$PANEL_DOMAIN.conf" >/dev/null || true
+        echo "WARNING: apache configtest failed — panel vhost disabled again. Output:"
+        apache2ctl configtest || true
+    fi
+
+    if [ -z "$PANEL_EMAIL" ]; then
+        echo "NOTE: PANEL_EMAIL not set — skipping the panel certificate. Issue it with:"
+        echo "      certbot --apache -d $PANEL_DOMAIN"
+    elif [ -d "/etc/letsencrypt/live/$PANEL_DOMAIN" ]; then
+        echo "Certificate for $PANEL_DOMAIN already exists — leaving it untouched."
+    else
+        # Guarded on live/ above because Let's Encrypt caps duplicate
+        # certificates at 5 per week. Non-fatal because DNS for a fresh panel
+        # domain frequently has not propagated yet; re-running issues it later.
+        certbot --apache -d "$PANEL_DOMAIN" --non-interactive --agree-tos \
+            -m "$PANEL_EMAIL" --redirect \
+            || echo "WARNING: certbot failed for $PANEL_DOMAIN (does DNS point here yet?). Re-run this script to retry."
+    fi
+fi
+
 # --- panel queue worker ----------------------------------------------------
 # Provisioning jobs (git clone, composer, apache vhosts) MUST run in a
 # dedicated worker, not synchronously inside php-fpm. The php-fpm systemd unit
@@ -266,43 +526,30 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
+systemctl enable --now forge-panel-worker
+systemctl restart forge-panel-worker
 
-if [ -f "$PANEL_DIR/artisan" ]; then
-    # Route jobs through the database queue so they run in this worker rather
-    # than synchronously in the web request.
-    if [ -f "$PANEL_DIR/.env" ]; then
-        if grep -q '^QUEUE_CONNECTION=' "$PANEL_DIR/.env"; then
-            sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=database/' "$PANEL_DIR/.env"
-        else
-            echo 'QUEUE_CONNECTION=database' >> "$PANEL_DIR/.env"
-        fi
-        # Hand the panel the mysql admin password generated above (hex-only,
-        # so it is safe inside a sed replacement).
-        if grep -q '^FORGE_MYSQL_PASSWORD=' "$PANEL_DIR/.env"; then
-            sed -i "s/^FORGE_MYSQL_PASSWORD=.*/FORGE_MYSQL_PASSWORD=$MYSQL_ADMIN_PASSWORD/" "$PANEL_DIR/.env"
-        else
-            echo "FORGE_MYSQL_PASSWORD=$MYSQL_ADMIN_PASSWORD" >> "$PANEL_DIR/.env"
-        fi
-        sudo -u "$FORGE_USER" php "$PANEL_DIR/artisan" config:clear || true
-        # Creates the jobs table; tolerated if the DB is not reachable yet.
-        sudo -u "$FORGE_USER" php "$PANEL_DIR/artisan" migrate --force || true
+# --- summary ---------------------------------------------------------------
+echo
+echo "Panel deployed at $PANEL_DIR and its queue worker is running"
+echo "(forge-panel-worker.service), executing provisioning jobs as $FORGE_USER."
+echo
+echo "MySQL admin user 'forge_admin'@'localhost' is provisioned; its password lives"
+echo "in $MYSQL_PASSWORD_FILE and is synced into the panel's .env"
+echo "as FORGE_MYSQL_PASSWORD on every run."
+
+if [ -n "$PANEL_DOMAIN" ]; then
+    echo
+    if [ -d "/etc/letsencrypt/live/$PANEL_DOMAIN" ]; then
+        echo "The panel is served at https://$PANEL_DOMAIN"
+    else
+        echo "The panel is served at http://$PANEL_DOMAIN (no certificate yet)."
     fi
-    systemctl enable --now forge-panel-worker
-    systemctl restart forge-panel-worker
-    echo "Panel queue worker is running (forge-panel-worker.service)."
-else
-    echo "NOTE: $PANEL_DIR is not deployed yet — worker unit was installed but not started."
-    echo "      Deploy the panel there, then re-run this script (or:"
-    echo "      systemctl enable --now forge-panel-worker) to start it."
+    echo "Register the single admin account at /register — registration locks itself"
+    echo "once the first user exists."
 fi
 
 echo
-echo "MySQL admin user 'forge_admin'@'localhost' is provisioned; its password lives"
-echo "in $MYSQL_PASSWORD_FILE and is written to the panel's .env as"
-echo "FORGE_MYSQL_PASSWORD whenever the panel is deployed."
-echo
-echo "Deploy the panel into $PANEL_DIR (or set PANEL_DIR=... and re-run this"
-echo "script), configure its Apache vhost to route the panel's PHP through the forge"
-echo "FPM pool (/run/php/php-fpm-forge.sock), and set FORGE_FAKE_SHELL=false."
-echo "Re-running this script after the panel is deployed starts its queue worker"
-echo "(forge-panel-worker.service), which runs provisioning jobs as the forge user."
+echo "This script is safe to re-run; do so after changing PANEL_DOMAIN, pulling new"
+echo "panel code, or once DNS has propagated. Use SKIP_BUILD=1 to skip the asset"
+echo "rebuild when you only need configuration re-applied."

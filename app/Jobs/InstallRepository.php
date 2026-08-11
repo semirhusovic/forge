@@ -55,7 +55,7 @@ class InstallRepository implements ShouldQueue
             $shell->run('cp .env.example .env', cwd: $site->root_path, onOutput: $log);
             // Composer runs under the site's PHP so dependency resolution sees
             // the same platform the site will run on.
-            $shell->runOrFail(escapeshellarg($php).' /usr/bin/composer update --no-dev --no-interaction --prefer-dist', cwd: $site->root_path, timeout: 1800, onOutput: $log);
+            $shell->runOrFail(escapeshellarg($php).' '.escapeshellarg(config('forge.composer_binary')).' update --no-dev --no-interaction --prefer-dist', cwd: $site->root_path, timeout: 1800, onOutput: $log);
             $shell->run(escapeshellarg($php).' artisan key:generate --force', cwd: $site->root_path, onOutput: $log);
 
             $apache->installVhost($site, $log);

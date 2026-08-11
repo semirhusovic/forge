@@ -125,11 +125,12 @@ class Site extends Model
     public static function defaultDeployScript(string $rootPath, string $branch, string $phpVersion): string
     {
         $php = "/usr/bin/php{$phpVersion}";
+        $composer = config('forge.composer_binary');
 
         return <<<BASH
         cd {$rootPath}
         git pull origin {$branch}
-        {$php} /usr/bin/composer update --no-dev --no-interaction --prefer-dist --optimize-autoloader
+        {$php} {$composer} update --no-dev --no-interaction --prefer-dist --optimize-autoloader
         {$php} artisan migrate --force
         {$php} artisan optimize
         BASH;
