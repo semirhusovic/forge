@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Http::preventStrayRequests();
+
     config([
         'services.github.client_id' => 'client-id',
         'services.github.client_secret' => 'client-secret',
@@ -16,6 +18,12 @@ beforeEach(function () {
 });
 
 test('the settings page renders', function () {
+    // A full page (non-JSON) visit makes Inertia attempt SSR against the
+    // Vite dev server when a stale `public/hot` file is present locally;
+    // stub it so that unrelated, environment-dependent call doesn't trip
+    // preventStrayRequests().
+    Http::fake(['*/__inertia_ssr' => Http::response(null, 204)]);
+
     $this->actingAs($this->user)
         ->get(route('github.edit'))
         ->assertOk();

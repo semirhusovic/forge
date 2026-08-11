@@ -6,6 +6,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\GitHub\GitHubApiException;
 use App\Services\GitHub\GitHubClientFactory;
+use RuntimeException;
 
 class TeardownGitHubRepository
 {
@@ -33,11 +34,19 @@ class TeardownGitHubRepository
 
         // A malformed `repository` value would turn into a call against
         // `/repos//keys/{id}` — a nonsensical request against GitHub's API
-        // that could never succeed. Skip it rather than fire it; report()
-        // is deliberately not called here since ProvisionGitHubRepository
-        // already rejects unrecognised URLs at creation time, so a site can
-        // only end up here if the value was edited outside the panel.
+        // that could never succeed. Skip it rather than fire it, but still
+        // report(): ProvisionGitHubRepository rejects unrecognised URLs at
+        // creation time, so a site can only end up here if the value was
+        // edited outside the panel — and this is exactly the case where the
+        // deploy key and/or webhook are left orphaned on GitHub with no
+        // other trace of it.
         if ($repository === '') {
+            report(new RuntimeException(
+                "Site {$site->id} has GitHub resources recorded but its repository "
+                ."(\"{$site->repository}\") could not be parsed as a GitHub SSH URL — "
+                .'the deploy key and/or webhook were left orphaned on GitHub.',
+            ));
+
             return;
         }
 

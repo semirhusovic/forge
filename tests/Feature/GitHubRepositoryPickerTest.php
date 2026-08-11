@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Http::preventStrayRequests();
+
     $this->user = User::factory()->create();
     $this->user->github_token = 'gho_secret';
     $this->user->github_login = 'octocat';

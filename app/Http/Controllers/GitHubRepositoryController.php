@@ -25,8 +25,10 @@ class GitHubRepositoryController extends Controller
 
         $query = Str::lower(trim((string) $request->query('q', '')));
 
+        $client = $this->clients->for($request->user());
+
         try {
-            $repositories = $this->clients->for($request->user())->repositories();
+            $repositories = $client->repositories();
         } catch (GitHubApiException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
@@ -39,7 +41,7 @@ class GitHubRepositoryController extends Controller
         }
 
         return response()->json([
-            'repositories' => array_values(array_slice($repositories, 0, self::MAX_RESULTS)),
+            'repositories' => array_slice($repositories, 0, self::MAX_RESULTS),
         ]);
     }
 

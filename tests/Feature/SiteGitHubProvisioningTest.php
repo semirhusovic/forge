@@ -1,8 +1,10 @@
 <?php
 
+use App\Actions\ProvisionGitHubRepository;
 use App\Jobs\InstallRepository;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\GitHub\GitHubApiException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -12,6 +14,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     config(['forge.fake_shell' => true]);
     Queue::fake();
+    Http::preventStrayRequests();
 
     $this->user = User::factory()->create();
 });
@@ -98,6 +101,28 @@ test('an unconnected user keeps the manual flow untouched', function () {
         ->post(route('sites.store'), siteAttributes())
         ->assertRedirect()
         ->assertSessionHas('success', fn (string $message): bool => str_contains($message, 'Add the deploy key'));
+
+    Http::assertNothingSent();
+    Queue::assertNotPushed(InstallRepository::class);
+});
+
+test('a malformed repository does not falsely blame the deploy key step', function () {
+    Http::fake();
+
+    $this->mock(ProvisionGitHubRepository::class)
+        ->shouldReceive('handle')
+        ->once()
+        ->andThrow(new GitHubApiException(
+            ProvisionGitHubRepository::INVALID_REPOSITORY_STATUS,
+            '"git@github.com:acme/app.git" is not a recognised GitHub SSH URL (expected git@github.com:owner/repo.git).',
+        ));
+
+    $this->actingAs(connectSiteOwner($this->user))
+        ->post(route('sites.store'), siteAttributes())
+        ->assertRedirect()
+        ->assertSessionHas('error', fn (string $error): bool => ! str_contains($error, 'the deploy key could not be added')
+            && ! str_contains($error, 'the webhook could not be added')
+            && str_contains($error, 'not a recognised GitHub SSH URL'));
 
     Http::assertNothingSent();
     Queue::assertNotPushed(InstallRepository::class);

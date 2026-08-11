@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    Http::preventStrayRequests();
+});
+
 function connectedUser(): User
 {
     $user = User::factory()->create();

@@ -9,6 +9,15 @@ use App\Services\GitHub\GitHubClientFactory;
 
 class ProvisionGitHubRepository
 {
+    /**
+     * Synthetic status for the empty-slug guard below — no HTTP request is
+     * ever made, so no real GitHub status applies. Kept out of the 100-599
+     * response range like {@see GitHubClient::send()}'s `0` (unreachable),
+     * but distinct from it and from `502` ({@see GitHubClient::extractId()})
+     * so callers can tell "never attempted" from "GitHub responded badly".
+     */
+    public const INVALID_REPOSITORY_STATUS = -1;
+
     public function __construct(private GitHubClientFactory $clients) {}
 
     /**
@@ -25,7 +34,10 @@ class ProvisionGitHubRepository
         $repository = $site->repositoryFullName();
 
         if ($repository === '') {
-            throw new GitHubApiException(422, "\"{$site->repository}\" is not a recognised GitHub SSH URL (expected git@github.com:owner/repo.git).");
+            throw new GitHubApiException(
+                self::INVALID_REPOSITORY_STATUS,
+                "\"{$site->repository}\" is not a recognised GitHub SSH URL (expected git@github.com:owner/repo.git).",
+            );
         }
 
         $client = $this->clients->for($user);

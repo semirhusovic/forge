@@ -1,7 +1,9 @@
 <?php
 
+use App\Actions\TeardownGitHubRepository;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -106,5 +108,21 @@ test('a site with a malformed repository slug deletes without calling github', f
         ->assertRedirect(route('sites.index'));
 
     expect(Site::find($this->site->id))->toBeNull();
+    Http::assertNothingSent();
+});
+
+test('a malformed repository slug is reported so the orphaned resources are not silent', function () {
+    $this->site->update(['repository' => 'not-a-github-url']);
+
+    Http::fake();
+
+    $this->mock(ExceptionHandler::class)
+        ->shouldReceive('report')
+        ->once()
+        ->withArgs(fn (Throwable $exception): bool => str_contains($exception->getMessage(), "Site {$this->site->id}")
+            && str_contains($exception->getMessage(), 'orphaned'));
+
+    app(TeardownGitHubRepository::class)->handle($this->site, connectUser($this->user));
+
     Http::assertNothingSent();
 });

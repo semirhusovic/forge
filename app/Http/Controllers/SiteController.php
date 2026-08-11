@@ -144,6 +144,11 @@ class SiteController extends Controller
      */
     private function provisionFailureMessage(Site $site, GitHubApiException $exception): string
     {
+        if ($exception->status === ProvisionGitHubRepository::INVALID_REPOSITORY_STATUS) {
+            return "Site created, but GitHub provisioning could not be started: {$exception->getMessage()} "
+                .'Fix the repository below, then add the deploy key and webhook manually and click Install.';
+        }
+
         $missing = $site->github_key_id === null ? 'deploy key' : 'webhook';
 
         return "Site created, but the {$missing} could not be added to GitHub: {$exception->getMessage()} "
