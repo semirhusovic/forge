@@ -99,7 +99,7 @@ test('a callback with a missing code query param stores nothing', function () {
 test('a failed viewer lookup after a successful token exchange stores nothing', function () {
     Http::fake([
         'github.com/login/oauth/access_token' => Http::response(['access_token' => 'gho_token']),
-        'api.github.com/user' => Http::response(['message' => 'Bad credentials'], 401),
+        'api.github.com/user' => Http::response(['message' => 'Internal Server Error'], 500),
     ]);
 
     $this->actingAs($this->user)
