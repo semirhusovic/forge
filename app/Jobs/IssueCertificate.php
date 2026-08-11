@@ -30,7 +30,11 @@ class IssueCertificate implements ShouldQueue
     public function handle(ShellRunner $shell): void
     {
         $site = $this->site;
-        $site->appendProvisionLog("\n--- Issuing SSL certificate ---\n");
+
+        // Reset per issuance, mirroring InstallRepository: the tab shows the
+        // current attempt rather than every certbot run ever concatenated.
+        $site->update(['ssl_log' => '']);
+        $site->appendSslLog("--- Issuing SSL certificate ---\n");
 
         // --force-renewal so a manual re-issue replaces a still-valid cert
         // instead of certbot exiting 0 with "not yet due for renewal".
@@ -38,20 +42,20 @@ class IssueCertificate implements ShouldQueue
             'sudo certbot --apache --non-interactive --agree-tos --redirect --force-renewal -m %s -d %s',
             escapeshellarg((string) config('forge.certbot_email')),
             escapeshellarg($site->domain),
-        ), timeout: 570, onOutput: fn (string $chunk) => $site->appendProvisionLog($chunk));
+        ), timeout: 570, onOutput: fn (string $chunk) => $site->appendSslLog($chunk));
 
         if ($result->successful()) {
             // Certbot's own systemd timer renews; 90 days is Let's Encrypt's validity.
             $site->update(['ssl_enabled' => true, 'ssl_expires_at' => now()->addDays(90)]);
-            $site->appendProvisionLog("\nSSL enabled.\n");
+            $site->appendSslLog("\nSSL enabled.\n");
         } else {
-            $site->appendProvisionLog("\nSSL ISSUANCE FAILED.\n");
+            $site->appendSslLog("\nSSL ISSUANCE FAILED.\n");
         }
     }
 
     public function failed(?Throwable $exception): void
     {
-        $this->site->appendProvisionLog(
+        $this->site->appendSslLog(
             "\nSSL ISSUANCE FAILED: ".($exception?->getMessage() ?? 'unknown error')."\n"
         );
     }

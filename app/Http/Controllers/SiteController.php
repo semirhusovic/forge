@@ -55,7 +55,7 @@ class SiteController extends Controller
                 ...$site->only([
                     'id', 'domain', 'repository', 'branch', 'root_path', 'status',
                     'php_version', 'deploy_script', 'auto_deploy', 'deploy_key_public',
-                    'ssl_enabled', 'ssl_expires_at', 'has_scheduler', 'provision_log',
+                    'ssl_enabled', 'ssl_expires_at', 'has_scheduler', 'provision_log', 'ssl_log',
                 ]),
                 'webhook_url' => $site->webhookUrl(),
             ],

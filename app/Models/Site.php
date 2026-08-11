@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $ssl_expires_at
  * @property bool $has_scheduler
  * @property string|null $provision_log
+ * @property string|null $ssl_log
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -32,7 +33,7 @@ use Illuminate\Support\Carbon;
     'domain', 'repository', 'branch', 'root_path', 'web_root_suffix', 'php_version',
     'status', 'deploy_script', 'auto_deploy', 'webhook_token',
     'deploy_key_public', 'ssl_enabled', 'ssl_expires_at',
-    'has_scheduler', 'provision_log',
+    'has_scheduler', 'provision_log', 'ssl_log',
 ])]
 class Site extends Model
 {
@@ -82,17 +83,36 @@ class Site extends Model
         return $this->root_path.$this->web_root_suffix;
     }
 
+    /** Install pipeline output — rendered by the Application tab. */
     public function appendProvisionLog(string $chunk): void
     {
-        // Atomic SQL append — a read-modify-write here would lose chunks if
-        // another process wrote between the read and the write.
+        $this->appendLog('provision_log', $chunk);
+    }
+
+    /**
+     * Certbot output. Deliberately a separate column from provision_log: the
+     * two are written by different jobs and rendered by different tabs, and
+     * sharing one column made the SSL tab display install output.
+     */
+    public function appendSslLog(string $chunk): void
+    {
+        $this->appendLog('ssl_log', $chunk);
+    }
+
+    /**
+     * Atomic SQL append — a read-modify-write here would lose chunks if
+     * another process wrote between the read and the write. $column is only
+     * ever passed a literal by the two callers above.
+     */
+    private function appendLog(string $column, string $chunk): void
+    {
         $this->newQuery()->whereKey($this->getKey())->update([
-            'provision_log' => $this->getConnection()->raw(
-                "COALESCE(provision_log, '') || ".$this->getConnection()->getPdo()->quote($chunk)
+            $column => $this->getConnection()->raw(
+                "COALESCE({$column}, '') || ".$this->getConnection()->getPdo()->quote($chunk)
             ),
         ]);
 
-        $this->provision_log = ($this->provision_log ?? '').$chunk;
+        $this->{$column} = ($this->{$column} ?? '').$chunk;
     }
 
     /** CLI binary matching the site's PHP version (provisioned by server-setup.sh). */

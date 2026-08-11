@@ -44,8 +44,8 @@ function issue() {
         </button>
 
         <pre
-            v-if="site.provision_log"
+            v-if="site.ssl_log"
             class="max-h-96 overflow-auto rounded bg-black p-3 text-xs text-green-400"
-            >{{ site.provision_log }}</pre>
+            >{{ site.ssl_log }}</pre>
     </div>
 </template>

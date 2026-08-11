@@ -35,6 +35,7 @@ export interface SiteProps {
     ssl_expires_at: string | null;
     has_scheduler: boolean;
     provision_log: string | null;
+    ssl_log: string | null;
     webhook_url: string;
 }
 
