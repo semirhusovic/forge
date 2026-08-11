@@ -71,6 +71,46 @@ test('a mismatched state is rejected', function () {
     Http::assertNothingSent();
 });
 
+test('a callback with no session state at all is rejected', function () {
+    Http::fake();
+
+    $this->actingAs($this->user)
+        ->get(route('github.callback', ['code' => 'the-code', 'state' => 'anything']))
+        ->assertForbidden();
+
+    expect($this->user->fresh()->hasGitHubConnection())->toBeFalse();
+    Http::assertNothingSent();
+});
+
+test('a callback with a missing code query param stores nothing', function () {
+    Http::fake([
+        'github.com/login/oauth/access_token' => Http::response(['error_description' => 'The code is missing.']),
+    ]);
+
+    $this->actingAs($this->user)
+        ->withSession(['github_oauth_state' => 'state-value'])
+        ->get(route('github.callback', ['state' => 'state-value']))
+        ->assertRedirect(route('github.edit'))
+        ->assertSessionHas('error');
+
+    expect($this->user->fresh()->hasGitHubConnection())->toBeFalse();
+});
+
+test('a failed viewer lookup after a successful token exchange stores nothing', function () {
+    Http::fake([
+        'github.com/login/oauth/access_token' => Http::response(['access_token' => 'gho_token']),
+        'api.github.com/user' => Http::response(['message' => 'Bad credentials'], 401),
+    ]);
+
+    $this->actingAs($this->user)
+        ->withSession(['github_oauth_state' => 'state-value'])
+        ->get(route('github.callback', ['code' => 'the-code', 'state' => 'state-value']))
+        ->assertRedirect(route('github.edit'))
+        ->assertSessionHas('error');
+
+    expect($this->user->fresh()->hasGitHubConnection())->toBeFalse();
+});
+
 test('a failed token exchange stores nothing', function () {
     Http::fake([
         'github.com/login/oauth/access_token' => Http::response(['error_description' => 'The code is expired.']),

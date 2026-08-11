@@ -23,6 +23,9 @@ class GitHubConnectionController extends Controller
 
     public function __construct(private GitHubClientFactory $clients) {}
 
+    /**
+     * Show the GitHub connection settings page.
+     */
     public function edit(): Response
     {
         return Inertia::render('settings/GitHub', [
@@ -31,10 +34,13 @@ class GitHubConnectionController extends Controller
         ]);
     }
 
+    /**
+     * Redirect the user to GitHub to authorize the requested scopes.
+     */
     public function create(Request $request): RedirectResponse
     {
         if (blank(config('services.github.client_id')) || blank(config('services.github.client_secret'))) {
-            return back()->with('error', 'Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in the panel .env first.');
+            return to_route('github.edit')->with('error', 'Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in the panel .env first.');
         }
 
         $state = Str::random(40);
@@ -48,6 +54,9 @@ class GitHubConnectionController extends Controller
         ]));
     }
 
+    /**
+     * Exchange the OAuth code for a token and store the connected account.
+     */
     public function callback(Request $request): RedirectResponse
     {
         $expected = $request->session()->pull('github_oauth_state');
@@ -93,6 +102,9 @@ class GitHubConnectionController extends Controller
         return to_route('github.edit')->with('success', "Connected to GitHub as {$viewer['login']}.");
     }
 
+    /**
+     * Clear the stored GitHub connection.
+     */
     public function destroy(Request $request): RedirectResponse
     {
         $request->user()->clearGitHubConnection();
