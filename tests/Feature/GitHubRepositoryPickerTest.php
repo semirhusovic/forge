@@ -79,6 +79,24 @@ test('a malformed repository slug is rejected', function () {
         ->assertStatus(422);
 });
 
+test('a repository slug containing a path traversal segment is rejected', function (string $repository) {
+    $this->actingAs($this->user)
+        ->getJson(route('github.branches', ['repository' => $repository]))
+        ->assertStatus(422);
+})->with(['../..', 'a/..']);
+
+test('a legitimate repository name containing a dot is accepted', function () {
+    Http::fake([
+        'api.github.com/repos/acme/my.app/branches*' => Http::response([['name' => 'main']]),
+        'api.github.com/repos/acme/my.app' => Http::response(['default_branch' => 'main']),
+    ]);
+
+    $this->actingAs($this->user)
+        ->getJson(route('github.branches', ['repository' => 'acme/my.app']))
+        ->assertOk()
+        ->assertJson(['branches' => ['main'], 'default_branch' => 'main']);
+});
+
 test('a github failure is reported as a readable error', function () {
     Http::fake([
         'api.github.com/repos/acme/app/branches*' => Http::response(['message' => 'Not Found'], 404),

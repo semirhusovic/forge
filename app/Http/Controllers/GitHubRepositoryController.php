@@ -48,7 +48,7 @@ class GitHubRepositoryController extends Controller
         abort_unless($request->user()->hasGitHubConnection(), 403, 'Connect a GitHub account first.');
 
         $validated = $request->validate([
-            'repository' => ['required', 'string', 'regex:/^[\w.-]+\/[\w.-]+$/D'],
+            'repository' => ['required', 'string', 'regex:/^(?!.*\.\.)[\w.-]+\/[\w.-]+$/D'],
         ]);
 
         $client = $this->clients->for($request->user());
