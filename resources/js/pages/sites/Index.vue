@@ -11,13 +11,19 @@ import {
     Trash2,
 } from '@lucide/vue';
 import { ref } from 'vue';
+import RepositoryCombobox from '@/components/RepositoryCombobox.vue';
 import StatusBadge from '@/components/StatusBadge.vue';
+import {
+    branches as githubBranches,
+    edit as githubSettings,
+} from '@/routes/github';
 import {
     destroy as sitesDestroy,
     index as sitesIndex,
     show as siteShow,
     store as sitesStore,
 } from '@/routes/sites';
+import type { Repository } from '@/types';
 
 interface SiteListItem {
     id: number;
@@ -33,6 +39,7 @@ const props = defineProps<{
     sites: SiteListItem[];
     phpVersions: string[];
     defaultPhpVersion: string;
+    githubConnected: boolean;
 }>();
 
 defineOptions({
@@ -50,6 +57,34 @@ const form = useForm({
     branch: 'main',
     php_version: props.defaultPhpVersion,
 });
+
+const manualEntry = ref(!props.githubConnected);
+const branches = ref<string[]>([]);
+const branchesLoading = ref(false);
+
+async function onRepositorySelected(repository: Repository) {
+    form.repository = `git@github.com:${repository.full_name}.git`;
+    form.branch = repository.default_branch;
+    branches.value = [repository.default_branch];
+    branchesLoading.value = true;
+
+    try {
+        const response = await fetch(
+            `${githubBranches().url}?repository=${encodeURIComponent(repository.full_name)}`,
+            { headers: { Accept: 'application/json' } },
+        );
+        const data = await response.json();
+
+        if (response.ok) {
+            branches.value = data.branches;
+            form.branch = data.default_branch;
+        }
+    } catch {
+        // Keep the default branch; the operator can switch to manual entry.
+    } finally {
+        branchesLoading.value = false;
+    }
+}
 
 function submit() {
     form.post(sitesStore().url, {
@@ -155,7 +190,25 @@ function repoShort(repository: string) {
                     </label>
                     <label class="text-sm font-medium">
                         Branch
+                        <select
+                            v-if="githubConnected && !manualEntry"
+                            v-model="form.branch"
+                            :disabled="branchesLoading || !branches.length"
+                            class="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
+                        >
+                            <option v-if="!branches.length" value="">
+                                Pick a repository first
+                            </option>
+                            <option
+                                v-for="branch in branches"
+                                :key="branch"
+                                :value="branch"
+                            >
+                                {{ branch }}
+                            </option>
+                        </select>
                         <div
+                            v-else
                             class="mt-1.5 flex items-center rounded-lg border border-input bg-background focus-within:ring-2 focus-within:ring-ring"
                         >
                             <GitBranch
@@ -174,12 +227,43 @@ function repoShort(repository: string) {
                 </div>
                 <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
                     <label class="text-sm font-medium">
-                        Repository (SSH)
+                        <span class="flex items-center justify-between gap-2">
+                            Repository
+                            <button
+                                v-if="githubConnected"
+                                type="button"
+                                class="text-xs font-normal text-muted-foreground underline-offset-2 hover:underline"
+                                @click="manualEntry = !manualEntry"
+                            >
+                                {{
+                                    manualEntry
+                                        ? 'Pick from GitHub'
+                                        : 'Enter manually'
+                                }}
+                            </button>
+                        </span>
+                        <RepositoryCombobox
+                            v-if="githubConnected && !manualEntry"
+                            @selected="onRepositorySelected"
+                        />
                         <input
+                            v-else
                             v-model="form.repository"
                             placeholder="git@github.com:user/repo.git"
                             class="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
                         />
+                        <span
+                            v-if="!githubConnected"
+                            class="mt-1.5 block text-xs text-muted-foreground"
+                        >
+                            <Link
+                                :href="githubSettings().url"
+                                class="underline underline-offset-2"
+                                >Connect GitHub</Link
+                            >
+                            to pick a repository and install the deploy key and
+                            webhook automatically.
+                        </span>
                         <span
                             v-if="form.errors.repository"
                             class="field-error"
