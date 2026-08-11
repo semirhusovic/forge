@@ -62,7 +62,13 @@ const manualEntry = ref(!props.githubConnected);
 const branches = ref<string[]>([]);
 const branchesLoading = ref(false);
 
+// Guards against an older `/github/branches` response landing after a newer
+// selection has already been made (see onRepositorySelected below).
+let branchesRequestId = 0;
+
 async function onRepositorySelected(repository: Repository) {
+    const requestId = ++branchesRequestId;
+
     form.repository = `git@github.com:${repository.full_name}.git`;
     form.branch = repository.default_branch;
     branches.value = [repository.default_branch];
@@ -75,6 +81,10 @@ async function onRepositorySelected(repository: Repository) {
         );
         const data = await response.json();
 
+        if (requestId !== branchesRequestId) {
+            return;
+        }
+
         if (response.ok) {
             branches.value = data.branches;
             form.branch = data.default_branch;
@@ -82,7 +92,9 @@ async function onRepositorySelected(repository: Repository) {
     } catch {
         // Keep the default branch; the operator can switch to manual entry.
     } finally {
-        branchesLoading.value = false;
+        if (requestId === branchesRequestId) {
+            branchesLoading.value = false;
+        }
     }
 }
 

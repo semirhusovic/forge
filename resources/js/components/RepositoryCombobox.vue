@@ -26,7 +26,13 @@ watch(debounced, () => {
     void load();
 });
 
+// Guards against a slower, earlier keystroke's response landing after a
+// newer search has already started (see load below).
+let searchRequestId = 0;
+
 async function load() {
+    const requestId = ++searchRequestId;
+
     loading.value = true;
     failed.value = false;
 
@@ -37,14 +43,24 @@ async function load() {
         );
         const data = await response.json();
 
+        if (requestId !== searchRequestId) {
+            return;
+        }
+
         results.value = response.ok ? data.repositories : [];
         failed.value = !response.ok;
     } catch {
+        if (requestId !== searchRequestId) {
+            return;
+        }
+
         results.value = [];
         failed.value = true;
     } finally {
-        loading.value = false;
-        highlighted.value = 0;
+        if (requestId === searchRequestId) {
+            loading.value = false;
+            highlighted.value = 0;
+        }
     }
 }
 
