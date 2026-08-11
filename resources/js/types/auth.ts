@@ -7,6 +7,9 @@ export type User = {
     two_factor_enabled?: boolean;
     created_at: string;
     updated_at: string;
+    github_login?: string | null;
+    github_avatar_url?: string | null;
+    github_connected_at?: string | null;
     [key: string]: unknown;
 };
 
