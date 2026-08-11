@@ -21,6 +21,8 @@ use Illuminate\Support\Carbon;
  * @property bool $auto_deploy
  * @property string $webhook_token
  * @property string|null $deploy_key_public
+ * @property int|null $github_key_id
+ * @property int|null $github_hook_id
  * @property bool $ssl_enabled
  * @property Carbon|null $ssl_expires_at
  * @property bool $has_scheduler
@@ -33,7 +35,7 @@ use Illuminate\Support\Carbon;
     'domain', 'repository', 'branch', 'root_path', 'web_root_suffix', 'php_version',
     'status', 'deploy_script', 'auto_deploy', 'webhook_token',
     'deploy_key_public', 'ssl_enabled', 'ssl_expires_at',
-    'has_scheduler', 'provision_log', 'ssl_log',
+    'has_scheduler', 'provision_log', 'ssl_log', 'github_key_id', 'github_hook_id',
 ])]
 class Site extends Model
 {
@@ -71,6 +73,18 @@ class Site extends Model
     public function cloneUrl(): string
     {
         return preg_replace('/github\.com/', $this->gitHostAlias(), $this->repository, 1);
+    }
+
+    /**
+     * The `owner/repo` slug the GitHub API addresses this site's repository
+     * by. StoreSiteRequest constrains `repository` to the SSH form, so the
+     * pattern always matches for panel-created sites.
+     */
+    public function repositoryFullName(): string
+    {
+        preg_match('/^git@github\.com:(.+?)(?:\.git)?$/D', $this->repository, $matches);
+
+        return $matches[1] ?? '';
     }
 
     public function webhookUrl(): string
