@@ -62,12 +62,23 @@ const manualEntry = ref(!props.githubConnected);
 const branches = ref<string[]>([]);
 const branchesLoading = ref(false);
 
+// Guards against an older `/github/branches` response landing after a newer
+// selection — or a mode toggle — has already made it stale (see
+// onRepositorySelected and the watcher below).
+let branchesRequestId = 0;
+
 // Whichever direction the mode is toggled, the previously fetched branch
 // list no longer describes the repository the operator is about to pick or
 // type — clear it so the select can't be submitted still holding a branch
 // that belongs to a different repository.
 watch(manualEntry, (isManual) => {
+    // Invalidate any in-flight onRepositorySelected() branch fetch too: its
+    // `finally` block declines to touch branchesLoading once its requestId
+    // is stale, so reset it here or a toggle mid-fetch would strand the
+    // spinner on.
+    branchesRequestId++;
     branches.value = [];
+    branchesLoading.value = false;
     form.branch = '';
 
     if (!isManual) {
@@ -78,10 +89,6 @@ watch(manualEntry, (isManual) => {
         form.repository = '';
     }
 });
-
-// Guards against an older `/github/branches` response landing after a newer
-// selection has already been made (see onRepositorySelected below).
-let branchesRequestId = 0;
 
 async function onRepositorySelected(repository: Repository) {
     const requestId = ++branchesRequestId;
