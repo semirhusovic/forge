@@ -100,8 +100,35 @@ test('a 401 clears the stored connection before throwing', function () {
 });
 
 test('a network failure surfaces as a GitHubApiException', function () {
-    Http::fake(fn () => throw new ConnectionException('cURL error 28: timed out'));
+    $attempts = 0;
+    Http::fake(function () use (&$attempts) {
+        $attempts++;
+
+        throw new ConnectionException('cURL error 28: timed out');
+    });
 
     expect(fn () => (new GitHubClient(connectedUser()))->viewer())
         ->toThrow(GitHubApiException::class, 'Could not reach GitHub');
+
+    // retry(2, ...) means 2 total attempts, not 2 retries after the first.
+    expect($attempts)->toBe(2);
+});
+
+test('a malformed repository entry is skipped instead of throwing', function () {
+    Http::fake(['api.github.com/user/repos*' => Http::response([
+        ['private' => false, 'default_branch' => 'main'],
+        ['full_name' => 'acme/app', 'private' => false, 'default_branch' => 'main'],
+    ])]);
+
+    expect((new GitHubClient(connectedUser()))->repositories())
+        ->toBe([['full_name' => 'acme/app', 'private' => false, 'default_branch' => 'main']]);
+});
+
+test('a malformed branch entry is skipped instead of throwing', function () {
+    Http::fake(['api.github.com/repos/acme/app/branches*' => Http::response([
+        ['protected' => false],
+        ['name' => 'main'],
+    ])]);
+
+    expect((new GitHubClient(connectedUser()))->branches('acme/app'))->toBe(['main']);
 });

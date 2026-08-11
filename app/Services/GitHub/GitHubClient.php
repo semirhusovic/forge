@@ -47,6 +47,9 @@ class GitHubClient
      * as a qualifier. Paging the full list and caching it costs one round trip
      * per ten minutes instead of one per keystroke, and covers org repos.
      *
+     * Capped at {@see self::MAX_REPOSITORY_PAGES} pages (1,000 repositories);
+     * accounts with more than that will have the remainder silently truncated.
+     *
      * @return array<int, array{full_name: string, private: bool, default_branch: string}>
      */
     public function repositories(): array
@@ -63,8 +66,12 @@ class GitHubClient
                 ]);
 
                 foreach ($body as $repository) {
+                    if (! isset($repository['full_name']) || ! is_string($repository['full_name'])) {
+                        continue;
+                    }
+
                     $repositories[] = [
-                        'full_name' => (string) $repository['full_name'],
+                        'full_name' => $repository['full_name'],
                         'private' => (bool) ($repository['private'] ?? false),
                         'default_branch' => (string) ($repository['default_branch'] ?? 'main'),
                     ];
@@ -79,7 +86,12 @@ class GitHubClient
         });
     }
 
-    /** @return array<int, string> */
+    /**
+     * Capped at {@see self::MAX_BRANCH_PAGES} pages (300 branches);
+     * repositories with more than that will have the remainder silently truncated.
+     *
+     * @return array<int, string>
+     */
     public function branches(string $fullName): array
     {
         $branches = [];
@@ -88,7 +100,11 @@ class GitHubClient
             $body = $this->get("/repos/{$fullName}/branches", ['per_page' => self::PER_PAGE, 'page' => $page]);
 
             foreach ($body as $branch) {
-                $branches[] = (string) $branch['name'];
+                if (! isset($branch['name']) || ! is_string($branch['name'])) {
+                    continue;
+                }
+
+                $branches[] = $branch['name'];
             }
 
             if (count($body) < self::PER_PAGE) {
